@@ -1,0 +1,207 @@
+"""Tests for Variational Quantum Eigensolver (VQE)."""
+
+import math
+
+import pytest
+import torch
+
+from qconduit.algorithms.vqe import VQE, ensure_hamiltonian_diag
+from qconduit.core.device import default_device
+from qconduit.layers.ansatzes import HardwareEfficientAnsatz
+
+
+class TestEnsureHamiltonianDiag:
+    """Tests for ensure_hamiltonian_diag helper function."""
+
+    def test_ensure_hamiltonian_diag_valid(self):
+        """Test ensure_hamiltonian_diag with valid input."""
+        hamiltonian = torch.tensor([0.0, 1.0])
+        device = default_device()
+        result = ensure_hamiltonian_diag(hamiltonian, n_qubits=1, device=device)
+        assert result.shape == (2,)
+        assert result.dtype == torch.float32
+        assert result.device.type == "cpu"
+
+    def test_ensure_hamiltonian_diag_wrong_dimension(self):
+        """Test ensure_hamiltonian_diag raises for wrong dimension."""
+        hamiltonian = torch.tensor([[0.0, 1.0], [1.0, 0.0]])  # 2D instead of 1D
+        device = default_device()
+        with pytest.raises(ValueError, match="must be 1D"):
+            ensure_hamiltonian_diag(hamiltonian, n_qubits=1, device=device)
+
+    def test_ensure_hamiltonian_diag_wrong_length(self):
+        """Test ensure_hamiltonian_diag raises for wrong length."""
+        hamiltonian = torch.tensor([0.0, 1.0, 2.0])  # Length 3, but 2**1 = 2
+        device = default_device()
+        with pytest.raises(ValueError, match="must have length"):
+            ensure_hamiltonian_diag(hamiltonian, n_qubits=1, device=device)
+
+    def test_ensure_hamiltonian_diag_converts_integer_to_float(self):
+        """Test ensure_hamiltonian_diag converts integer dtype to float."""
+        hamiltonian = torch.tensor([0, 1], dtype=torch.int32)
+        device = default_device()
+        result = ensure_hamiltonian_diag(hamiltonian, n_qubits=1, device=device)
+        assert result.dtype == torch.float32
+
+
+class TestVQE:
+    """Tests for VQE class."""
+
+    def test_vqe_initialization(self):
+        """Test VQE can be initialized."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+        assert vqe.ansatz == ansatz
+        assert vqe.hamiltonian_diag.shape == (2,)
+        assert torch.allclose(vqe.hamiltonian_diag, hamiltonian)
+
+    def test_vqe_energy_1_qubit_ground_state(self):
+        """Test VQE energy for 1-qubit system with |0⟩ state."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        # Hamiltonian: H = diag([0.0, 1.0]), so |0⟩ has energy 0, |1⟩ has energy 1
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Parameters that produce |0⟩ state (theta=0)
+        params = torch.tensor([0.0])
+        energy = vqe.energy(params)
+
+        # Should be close to 0.0 (energy of |0⟩)
+        assert torch.allclose(energy, torch.tensor(0.0), atol=1e-6)
+
+    def test_vqe_energy_1_qubit_excited_state(self):
+        """Test VQE energy for 1-qubit system with |1⟩ state."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Parameters that produce |1⟩ state (theta=π)
+        params = torch.tensor([math.pi])
+        energy = vqe.energy(params)
+
+        # Should be close to 1.0 (energy of |1⟩)
+        assert torch.allclose(energy, torch.tensor(1.0), atol=1e-6)
+
+    def test_vqe_forward_alias(self):
+        """Test VQE.forward() is an alias for energy()."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        params = torch.tensor([0.0])
+        energy1 = vqe.energy(params)
+        energy2 = vqe.forward(params)
+
+        assert torch.allclose(energy1, energy2)
+
+    def test_vqe_energy_batch_mode(self):
+        """Test VQE energy works in batch mode."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Batch: first element produces |0⟩, second produces |1⟩
+        params = torch.tensor([[0.0], [math.pi]])
+        energy = vqe.energy(params)
+
+        assert energy.shape == (2,)
+        assert torch.allclose(energy[0], torch.tensor(0.0), atol=1e-6)
+        assert torch.allclose(energy[1], torch.tensor(1.0), atol=1e-6)
+
+    def test_vqe_gradient(self):
+        """Test that gradients flow through VQE."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        params = torch.tensor([0.5], requires_grad=True)
+        energy = vqe.energy(params)
+
+        # Backward pass
+        energy.backward()
+
+        # Check gradients exist and are finite
+        assert params.grad is not None
+        assert torch.isfinite(params.grad).all()
+
+    def test_vqe_optimization(self):
+        """Test VQE can be used in an optimization loop."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        # Hamiltonian: H = diag([0.0, 1.0]), ground state is |0⟩ with energy 0
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Initialize parameters
+        params = torch.nn.Parameter(torch.tensor([math.pi / 2]))  # Start away from ground state
+
+        # Optimizer
+        optimizer = torch.optim.SGD([params], lr=0.1)
+
+        # Store initial energy
+        initial_energy = vqe.energy(params).item()
+
+        # Run optimization steps
+        for _ in range(20):
+            optimizer.zero_grad()
+            energy = vqe.energy(params)
+            energy.backward()
+            optimizer.step()
+
+        # Final energy should be lower than initial
+        final_energy = vqe.energy(params).item()
+        assert final_energy < initial_energy
+
+        # Final energy should be close to ground state energy (0.0)
+        # Allow some tolerance for optimization convergence
+        assert final_energy < 0.2  # Should be significantly below 1.0
+
+    def test_vqe_wrong_hamiltonian_length(self):
+        """Test VQE raises for wrong Hamiltonian length."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0, 2.0])  # Wrong length
+        with pytest.raises(ValueError, match="must have length"):
+            VQE(ansatz, hamiltonian)
+
+    def test_vqe_device_consistency(self):
+        """Test VQE uses correct device."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1, device="sv_cpu")
+        hamiltonian = torch.tensor([0.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        params = torch.tensor([0.0])
+        energy = vqe.energy(params)
+        assert energy.device.type == "cpu"
+
+    def test_vqe_with_custom_device(self):
+        """Test VQE can be initialized with a custom device."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        device = default_device()
+        vqe = VQE(ansatz, hamiltonian, device=device)
+
+        params = torch.tensor([0.0])
+        energy = vqe.energy(params)
+        assert energy.device.type == "cpu"
+
+    def test_vqe_2_qubit_system(self):
+        """Test VQE with a 2-qubit system."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=2, depth=1)
+        # Simple Hamiltonian: |00⟩ has energy 0, others have energy 1
+        hamiltonian = torch.tensor([0.0, 1.0, 1.0, 1.0])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Try to find ground state (should be close to |00⟩)
+        params = torch.nn.Parameter(torch.zeros(2))  # 2 qubits * 1 depth
+        optimizer = torch.optim.SGD([params], lr=0.1)
+
+        for _ in range(15):
+            optimizer.zero_grad()
+            energy = vqe.energy(params)
+            energy.backward()
+            optimizer.step()
+
+        # Energy should be low (close to 0)
+        final_energy = vqe.energy(params).item()
+        assert final_energy < 0.5  # Should be significantly below 1.0
+
