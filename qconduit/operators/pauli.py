@@ -300,10 +300,14 @@ class PauliSum:
         }
 
         # For each term, compute the Kronecker product and add to matrix
+        # Note: For little-endian indexing (qubit 0 is LSB), we need to reverse
+        # the order of the Kronecker product. If paulis = (P_0, P_1, ..., P_{n-1})
+        # where P_i acts on qubit i (LSB = 0), then the matrix is:
+        # P_{n-1} ⊗ P_{n-2} ⊗ ... ⊗ P_0
         for term in self.terms:
-            # Build tensor product: P_0 ⊗ P_1 ⊗ ... ⊗ P_{n-1}
-            term_matrix = pauli_matrices[term.paulis[0]]
-            for i in range(1, n_qubits):
+            # Build tensor product in reverse order for little-endian
+            term_matrix = pauli_matrices[term.paulis[n_qubits - 1]]
+            for i in range(n_qubits - 2, -1, -1):
                 pauli_i = pauli_matrices[term.paulis[i]]
                 # Kronecker product: A ⊗ B
                 term_matrix = torch.kron(term_matrix, pauli_i)

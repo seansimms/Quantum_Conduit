@@ -263,17 +263,20 @@ def apply_two_qubit_gate(
     )
     
     # The reshape extracts bits in a way that doesn't match the expected |q_high, q_low⟩ ordering.
-    # We need to correct the bit order: the reshape produces indices that need to be swapped.
+    # We need to correct the bit order for the swapped case, but not for the not-swapped case.
     # The correction swaps |01⟩ <-> |10⟩, which is the permutation [0, 2, 1, 3]
-    bit_correction_perm = torch.tensor([0, 2, 1, 3], device=state_reshaped.device, dtype=torch.long)
-    state_reshaped = state_reshaped[..., bit_correction_perm]
+    # For swapped case: apply bit correction to get correct |q_high, q_low⟩ ordering
+    # For not-swapped case: skip bit correction, reshape already gives correct |q_high, q_low⟩
+    if swapped:
+        bit_correction_perm = torch.tensor([0, 2, 1, 3], device=state_reshaped.device, dtype=torch.long)
+        state_reshaped = state_reshaped[..., bit_correction_perm]
     
-    # After bit correction, the combined index now correctly represents |q_high, q_low⟩
+    # After bit correction (if applied), the combined index now correctly represents |q_high, q_low⟩
     # The gate matrix is defined for (qubit1, qubit2) ordering
     # If swapped (qubit1 > qubit2), the gate is for |qubit1, qubit2⟩ = |q_high, q_low⟩
     # which matches our reshape after correction, so no transformation needed
     # If not swapped (qubit1 < qubit2), the gate is for |qubit1, qubit2⟩ = |q_low, q_high⟩
-    # so we need to swap the statevector indices
+    # so we need to swap the statevector indices from |q_high, q_low⟩ to |q_low, q_high⟩
     if not swapped:
         # Gate is defined for |qubit1, qubit2⟩ = |q_low, q_high⟩
         # But our reshape is for |q_high, q_low⟩
@@ -290,16 +293,18 @@ def apply_two_qubit_gate(
         state_transformed = state_transformed[..., swap_perm]
     
     # Reverse the bit correction to restore the original bit order for reshaping back
-    state_transformed = state_transformed[..., bit_correction_perm]
+    # Only apply if we applied it in the first place (swapped case)
+    if swapped:
+        bit_correction_perm = torch.tensor([0, 2, 1, 3], device=state_transformed.device, dtype=torch.long)
+        state_transformed = state_transformed[..., bit_correction_perm]
 
     # Reshape back: (batch, left, middle, right, 4) -> (batch, left, middle, right, 2, 2)
-    # The 4 states are in |q_low, q_high⟩ order (after bit correction)
+    # The 4 states are in |q_high, q_low⟩ order (after reversing transformations)
     state_transformed = state_transformed.reshape(
         batch_size, left_size, middle_size, right_size, 2, 2
     )
 
-    # Permute back: (batch, left, middle, right, q_low, q_high) -> (batch, left, q_low, middle, q_high, right)
-    # But we need to account for the bit correction, so we permute to (q_high, q_low) first
+    # Permute back: (batch, left, middle, right, q_high, q_low) -> (batch, left, q_low, middle, q_high, right)
     state_transformed = state_transformed.permute(0, 1, 5, 2, 4, 3)
 
     # Reshape back to (batch_size, 2**n_qubits)
