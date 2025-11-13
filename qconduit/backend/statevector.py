@@ -7,6 +7,7 @@ import math
 from typing import TYPE_CHECKING
 
 from ..core.device import Device, device as device_factory, default_device
+from ..diagnostics import is_debug_enabled, assert_normalized
 
 if TYPE_CHECKING:
     pass
@@ -168,7 +169,13 @@ def apply_gate(
     state_new = state_transformed.reshape(batch_size, dim)
 
     # Reshape back to original batch shape
-    return state_new.reshape(*batch_shape, dim)
+    new_state = state_new.reshape(*batch_shape, dim)
+
+    # In debug mode, verify that unitary gate preserves normalization
+    if is_debug_enabled():
+        assert_normalized(new_state, atol=1e-4)
+
+    return new_state
 
 
 def apply_two_qubit_gate(
@@ -310,7 +317,13 @@ def apply_two_qubit_gate(
     # Reshape back to (batch_size, 2**n_qubits)
     state_new = state_transformed.reshape(batch_size, dim)
 
-    return state_new.reshape(*batch_shape, dim)
+    new_state = state_new.reshape(*batch_shape, dim)
+
+    # In debug mode, verify that unitary gate preserves normalization
+    if is_debug_enabled():
+        assert_normalized(new_state, atol=1e-4)
+
+    return new_state
 
 
 def measure_expectation_z(

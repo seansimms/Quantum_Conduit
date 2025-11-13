@@ -31,7 +31,7 @@ def main() -> None:
     ansatz = qc.HardwareEfficientAnsatz(n_qubits=n_qubits, depth=depth)
 
     # Construct VQE
-    vqe = qc.VQE(ansatz=ansatz, hamiltonian_diag=hamiltonian_diag)
+    vqe = qc.VQE(ansatz=ansatz, hamiltonian=hamiltonian_diag)
 
     # Initialize learnable parameters (small random initialization)
     params = torch.nn.Parameter(0.1 * torch.randn(ansatz.num_parameters, dtype=torch.float32))

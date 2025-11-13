@@ -25,6 +25,7 @@ Quantum Conduit is a minimal, PyTorch-native quantum statevector library designe
 - [Architecture](#architecture)
 - [Examples](#examples)
 - [API Reference](#api-reference)
+- [Use Cases](#use-cases)
 - [Performance Considerations](#performance-considerations)
 - [Comparison with Alternatives](#comparison-with-alternatives)
 - [Contributing](#contributing)
@@ -41,6 +42,8 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 - **⚛️ Standard Gate Library**: Complete set of single- and two-qubit gates (I, X, Y, Z, H, S, T, CNOT, RX, RY, RZ)
 - **🖥️ Device Abstraction**: Seamless CPU and CUDA support with automatic device management
 - **🧩 QuantumModule**: PyTorch-native module system compatible with `torch.nn.Module`
+- **🔌 Circuit IR**: Structured circuit representation with simulation and visualization
+- **🔍 Diagnostics**: State validation, fidelity computation, and debugging tools
 
 ### Quantum Machine Learning
 
@@ -56,6 +59,7 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 - **🌪️ Noise Models**: Standard quantum channels (depolarizing, amplitude damping, phase damping)
 - **📦 Batch Processing**: Efficient batch operations for training quantum models
 - **🎨 Extensible Design**: Clean abstractions for custom gates, ansätze, and algorithms
+- **🐛 Debug Mode**: Built-in debugging with normalization checks and validation
 
 ## Installation
 
@@ -187,6 +191,71 @@ probs = measure_probs_dm(rho)
 print(f"Noisy probabilities: {probs}")
 ```
 
+### Example 5: Circuit IR
+
+```python
+from qconduit.circuit import QuantumCircuit
+
+# Create and simulate a Bell state circuit
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [1, 0])
+
+# Simulate the circuit
+state = circuit.simulate_state()
+
+# Visualize the circuit
+print(circuit.to_text_diagram())
+# Output:
+# q0: ─H──⊕─
+# q1: ────●─
+
+# Analyze circuit properties
+print(f"Depth: {circuit.depth()}")  # 2
+print(f"Gate counts: {circuit.gate_counts()}")  # {'H': 1, 'CNOT': 1}
+print(f"Number of gates: {circuit.num_gates()}")  # 2
+
+# Parametric gates
+circuit2 = QuantumCircuit(n_qubits=1)
+circuit2.add_gate("RX", [0], params=[0.5])  # Rotation gate with angle
+state2 = circuit2.simulate_state()
+```
+
+### Example 6: Diagnostics and Debug Mode
+
+```python
+import qconduit as qc
+from qconduit.diagnostics import state_norm, fidelity, bloch_vector, assert_normalized
+
+# Check state normalization
+state = qc.zero_state(n_qubits=1)
+norm = state_norm(state)
+print(f"State norm: {norm}")  # 1.0
+assert_normalized(state)  # Validates norm ≈ 1
+
+# Compute fidelity between states
+state1 = qc.zero_state(n_qubits=1)
+h_gate = qc.H()
+state2 = qc.apply_gate(state1, h_gate, qubit=0, n_qubits=1)
+f = fidelity(state1, state2)
+print(f"Fidelity: {f}")  # 0.5 (states are orthogonal)
+
+# Compute Bloch vector for single-qubit state
+bloch = bloch_vector(state2)
+print(f"Bloch vector (x, y, z): {bloch}")  # [1.0, 0.0, 0.0] for |+⟩
+
+# Enable debug mode for validation
+qc.set_debug_enabled(True)
+# Operations now include automatic normalization checks
+# This helps catch bugs during development
+
+# Use context manager for temporary debug mode
+with qc.debug_context(True):
+    # Debug checks enabled here
+    state = qc.apply_gate(state, h_gate, qubit=0, n_qubits=1)
+# Debug mode restored to previous state
+```
+
 ## Architecture
 
 ### Design Principles
@@ -206,11 +275,13 @@ qconduit/
 ├── core/           # Core abstractions (Device, QuantumModule)
 ├── backend/        # Statevector and density matrix backends
 ├── gates/          # Standard quantum gates
+├── circuit/        # Circuit IR (GateOp, QuantumCircuit)
 ├── layers/         # Parametric ansätze and hybrid blocks
 ├── algorithms/     # Quantum algorithms (VQE)
 ├── operators/      # Pauli operators and expectations
 ├── grad/           # Gradient computation (parameter-shift)
-└── noise/          # Noise models and quantum channels
+├── noise/          # Noise models and quantum channels
+└── diagnostics/    # State validation and debugging tools
 ```
 
 ### Key Components
@@ -220,6 +291,8 @@ qconduit/
 - **Density Matrix Backend**: Mixed-state simulation for noise (O(4^n) memory, small systems)
 - **Gate Library**: Standard gates with gradient-preserving implementations
 - **Module System**: `QuantumModule` base class compatible with PyTorch's module system
+- **Circuit IR**: Structured circuit representation with simulation and visualization
+- **Diagnostics**: State validation, fidelity computation, and debug mode integration
 
 ## Examples
 
@@ -256,7 +329,7 @@ class MyQuantumLayer(qc.QuantumModule):
 ### Backend Operations
 
 ```python
-# State creation
+# Statevector operations
 state = qc.zero_state(n_qubits=2, batch_shape=(10,))  # Batched states
 
 # Gate application
@@ -267,6 +340,18 @@ state = qc.apply_two_qubit_gate(state, qc.CNOT(), qubit1=0, qubit2=1, n_qubits=2
 # Measurements
 probs = qc.measure_probs(state, n_qubits=2)
 z_exp = qc.measure_expectation_z(state, qubit=0, n_qubits=2)
+
+# Density matrix operations (for noise modeling)
+rho = qc.zero_dm_state(n_qubits=2)  # Create |00><00|
+rho = qc.dm_from_statevector(state)  # Convert statevector to density matrix
+
+# Apply Kraus operators (for noise channels)
+kraus_ops = (E0, E1, E2)  # Tuple of 2x2 matrices
+rho = qc.apply_kraus_single_qubit(rho, kraus_ops, qubit=0, n_qubits=2)
+
+# Density matrix measurements
+probs_dm = qc.measure_probs_dm(rho)
+z_exp_dm = qc.measure_expectation_z_dm(rho, qubit=0, n_qubits=2)
 ```
 
 ### Gates
@@ -370,6 +455,89 @@ energy = param_shift_energy(ansatz, hamiltonian, params)
 energy.backward()  # Gradients computed via parameter-shift rule
 ```
 
+### Circuit IR
+
+```python
+from qconduit.circuit import QuantumCircuit, GateOp
+
+# Create a circuit
+circuit = QuantumCircuit(n_qubits=3)
+
+# Add gates
+circuit.add_gate("H", [0])  # Hadamard on qubit 0
+circuit.add_gate("CNOT", [0, 1])  # CNOT with control=0, target=1
+circuit.add_gate("RX", [2], params=[0.5])  # Parametric rotation
+
+# Circuit properties
+n_gates = circuit.num_gates()  # Number of gates
+gate_counts = circuit.gate_counts()  # Dict: {"H": 1, "CNOT": 1, "RX": 1}
+depth = circuit.depth()  # Circuit depth (parallel gate scheduling)
+
+# Simulate circuit
+state = circuit.simulate_state()  # Returns statevector
+
+# Visualize circuit
+diagram = circuit.to_text_diagram()
+print(diagram)
+# q0: ─H──●───────
+# q1: ────⊕───────
+# q2: ────────R───
+
+# Copy circuit
+circuit_copy = circuit.copy()
+
+# Access operations
+for op in circuit.ops:
+    print(f"{op.name} on qubits {op.qubits} with params {op.params}")
+```
+
+### Diagnostics
+
+```python
+import qconduit as qc
+from qconduit.diagnostics import (
+    state_norm,
+    assert_normalized,
+    is_hermitian,
+    assert_hermitian,
+    fidelity,
+    bloch_vector,
+    is_debug_enabled,
+    set_debug_enabled,
+    debug_context,
+)
+
+# State validation
+state = qc.zero_state(n_qubits=2)
+norm = state_norm(state)  # Compute L2 norm
+assert_normalized(state, atol=1e-5)  # Assert norm ≈ 1
+
+# Matrix validation
+matrix = qc.H()  # Get a gate matrix
+is_herm = is_hermitian(matrix)  # Check if Hermitian
+assert_hermitian(matrix, atol=1e-6)  # Assert Hermitian
+
+# Fidelity computation
+state1 = qc.zero_state(n_qubits=1)
+state2 = qc.apply_gate(state1, qc.H(), qubit=0, n_qubits=1)
+f = fidelity(state1, state2)  # |<state1|state2>|²
+
+# Bloch vector (single-qubit only)
+bloch = bloch_vector(state2)  # Returns (x, y, z) components
+
+# Debug mode management
+is_enabled = is_debug_enabled()  # Check current status
+set_debug_enabled(True)  # Enable globally
+
+# Context manager for temporary debug mode
+with debug_context(True):
+    # Debug checks enabled here
+    state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=1)
+# Debug mode restored to previous state
+
+# Environment variable: QCONDUIT_DEBUG=1 enables debug mode at startup
+```
+
 ### Noise Models
 
 ```python
@@ -406,6 +574,106 @@ rho = dm_from_statevector(state)
 # Measurements
 probs = measure_probs_dm(rho)
 z_exp = measure_expectation_z_dm(rho, qubit=0, n_qubits=2)
+```
+
+## Use Cases
+
+### When to Use Circuit IR vs Direct Gate Application
+
+**Use Circuit IR (`QuantumCircuit`)** when:
+- You need to **visualize** circuits with `to_text_diagram()`
+- You want to **analyze** circuit properties (depth, gate counts)
+- You're building circuits **dynamically** or from external specifications
+- You need to **copy** or **modify** circuits before simulation
+- You're working with **circuit optimization** or compilation
+
+**Use direct gate application** when:
+- You need **maximum performance** (no IR overhead)
+- You're building circuits **statically** in code
+- You want **direct control** over state manipulation
+- You're working with **batched operations** (Circuit IR doesn't support batching yet)
+
+**Example: Circuit IR for visualization**
+```python
+from qconduit.circuit import QuantumCircuit
+
+circuit = QuantumCircuit(n_qubits=3)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+circuit.add_gate("CNOT", [1, 2])
+print(circuit.to_text_diagram())
+# Great for debugging and documentation!
+```
+
+**Example: Direct gates for performance**
+```python
+import qconduit as qc
+
+# More efficient for tight loops
+state = qc.zero_state(n_qubits=3, batch_shape=(100,))  # Batched
+for i in range(100):
+    state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=3)
+```
+
+### Debug Mode Best Practices
+
+**Enable debug mode during development:**
+```python
+import qconduit as qc
+
+# Global enable for development
+qc.set_debug_enabled(True)
+
+# Or use environment variable
+# QCONDUIT_DEBUG=1 python your_script.py
+```
+
+**Use context managers for specific sections:**
+```python
+# Only enable for critical sections
+with qc.debug_context(True):
+    # Critical quantum operations
+    state = complex_quantum_operation(state)
+# Automatically disabled after context
+```
+
+**Debug mode automatically:**
+- Validates state normalization after gate applications
+- Helps catch bugs early in development
+- Has minimal overhead when disabled (production-ready)
+
+### Diagnostics for Validation and Debugging
+
+**State validation:**
+```python
+from qconduit.diagnostics import assert_normalized, state_norm
+
+# Validate states in test suites
+def test_my_quantum_function():
+    state = my_quantum_function()
+    assert_normalized(state)  # Raises if not normalized
+    assert state_norm(state).item() == pytest.approx(1.0)
+```
+
+**Fidelity for algorithm verification:**
+```python
+from qconduit.diagnostics import fidelity
+
+# Compare expected vs actual states
+expected = create_expected_state()
+actual = run_algorithm()
+f = fidelity(expected, actual)
+assert f > 0.99  # High fidelity means correct implementation
+```
+
+**Bloch vector for single-qubit visualization:**
+```python
+from qconduit.diagnostics import bloch_vector
+
+# Visualize single-qubit states
+state = create_single_qubit_state()
+bloch = bloch_vector(state)  # (x, y, z) coordinates
+# Use for plotting or analysis
 ```
 
 ## Performance Considerations
@@ -482,9 +750,9 @@ We welcome contributions! Here's how to get started:
    ```
 
 3. Run tests:
-   ```bash
-   pytest
-   ```
+```bash
+pytest
+```
 
 4. Run linter:
    ```bash

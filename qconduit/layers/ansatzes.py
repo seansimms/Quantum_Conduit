@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 import torch
 
@@ -11,6 +11,7 @@ from ..backend.statevector import apply_gate, apply_two_qubit_gate, zero_state
 from ..core.device import Device, default_device
 from ..core.module import QuantumModule
 from ..gates.standard import CNOT, RX
+from ..circuit import QuantumCircuit
 
 if TYPE_CHECKING:
     pass
@@ -56,6 +57,33 @@ class ParametricAnsatz(QuantumModule):
         raise NotImplementedError(
             "ParametricAnsatz.forward() must be implemented by subclasses"
         )
+
+    def build_circuit(self, params: Optional[torch.Tensor] = None) -> QuantumCircuit:
+        """
+        Build a QuantumCircuit representing this ansatz.
+
+        The default implementation raises NotImplementedError.
+        Subclasses may override to provide a concrete circuit IR.
+
+        Parameters
+        ----------
+        params:
+            Optional 1D tensor of numeric parameter values. If provided,
+            gates that depend on parameters should use these numeric
+            values in their GateOp entries. If None, subclasses may
+            choose default values (e.g. zeros).
+
+        Returns
+        -------
+        QuantumCircuit
+            A circuit with n_qubits equal to this ansatz's n_qubits.
+
+        Raises
+        ------
+        NotImplementedError:
+            If this method is not implemented by the subclass.
+        """
+        raise NotImplementedError("build_circuit is not implemented for this ansatz.")
 
 
 class HardwareEfficientAnsatz(ParametricAnsatz):
@@ -125,6 +153,35 @@ class HardwareEfficientAnsatz(ParametricAnsatz):
         # For unbatched: (num_parameters,) -> (depth, n_qubits)
         # For batched: (*batch, num_parameters) -> (*batch, depth, n_qubits)
         return params.reshape(*params.shape[:-1], self.depth, self.n_qubits)
+
+    def _iterate_layers(self) -> Iterable[Tuple[str, Tuple[int, ...], Optional[int]]]:
+        """
+        Yield the sequence of gate placements for this ansatz.
+
+        Each element is (name, qubits, param_index_or_none).
+
+        name:
+            Gate name, e.g. "RX" or "CNOT".
+        qubits:
+            Target qubits for the gate.
+        param_index_or_none:
+            Index into the flat parameter vector for parametric gates,
+            or None for non-parametric gates like CNOT.
+
+        This is purely structural and uses only generic hardware-efficient
+        patterns (layers of single-qubit rotations + entanglers).
+        """
+        param_idx = 0
+        for layer_idx in range(self.depth):
+            # Single-qubit RX rotations on all qubits
+            for qubit_idx in range(self.n_qubits):
+                yield ("RX", (qubit_idx,), param_idx)
+                param_idx += 1
+
+            # CNOT entangling gates (ladder pattern)
+            if self.n_qubits > 1:
+                for qubit_idx in range(self.n_qubits - 1):
+                    yield ("CNOT", (qubit_idx, qubit_idx + 1), None)
 
     def forward(self, params: torch.Tensor) -> torch.Tensor:
         """
@@ -242,4 +299,53 @@ class HardwareEfficientAnsatz(ParametricAnsatz):
                     )
 
         return state
+
+    def build_circuit(self, params: Optional[torch.Tensor] = None) -> QuantumCircuit:
+        """
+        Build a QuantumCircuit representing this ansatz.
+
+        The circuit structure mirrors the forward() method: layers of RX rotations
+        followed by CNOT entangling gates in a ladder pattern.
+
+        Parameters
+        ----------
+        params:
+            Optional 1D tensor of numeric parameter values. If provided,
+            must have length equal to num_parameters. If None, parametric
+            gates default to zero angles.
+
+        Returns
+        -------
+        QuantumCircuit
+            A circuit with n_qubits equal to this ansatz's n_qubits.
+
+        Raises
+        ------
+        ValueError:
+            If params is provided but has incorrect shape.
+        """
+        circuit = QuantumCircuit(self.n_qubits)
+
+        param_values: Optional[torch.Tensor]
+        if params is not None:
+            if params.dim() != 1 or params.numel() != self.num_parameters:
+                raise ValueError(
+                    "params must be a 1D tensor with length equal to num_parameters."
+                )
+            param_values = params.detach().cpu()
+        else:
+            param_values = None
+
+        for name, qubits, param_index in self._iterate_layers():
+            if param_index is not None:
+                if param_values is None:
+                    # Default to zero angle when no params supplied
+                    angle = 0.0
+                else:
+                    angle = float(param_values[param_index].item())
+                circuit.add_gate(name=name, qubits=qubits, params=(angle,))
+            else:
+                circuit.add_gate(name=name, qubits=qubits, params=None)
+
+        return circuit
 

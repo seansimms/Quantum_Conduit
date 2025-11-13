@@ -140,8 +140,8 @@ class VQE(nn.Module):
             # Validate n_qubits match
             if hamiltonian.n_qubits() != n_qubits:
                 raise ValueError(
-                    f"hamiltonian.n_qubits() = {hamiltonian.n_qubits()} does not "
-                    f"match ansatz.n_qubits = {n_qubits}"
+                    "PauliSum Hamiltonian n_qubits does not match ansatz.n_qubits "
+                    f"({hamiltonian.n_qubits()} vs {n_qubits})."
                 )
             self.hamiltonian_pauli = hamiltonian
             self.hamiltonian_diag = None
@@ -227,6 +227,13 @@ class VQE(nn.Module):
             # Noiseless path: use pure state expectations
             if self.hamiltonian_diag is not None:
                 # Diagonal Hamiltonian path
+                # Validate dimension match
+                if self.hamiltonian_diag.shape[0] != state.shape[-1]:
+                    raise ValueError(
+                        f"Diagonal Hamiltonian length {self.hamiltonian_diag.shape[0]} does not "
+                        f"match state dimension {state.shape[-1]}."
+                    )
+
                 # Compute probabilities: |state|²
                 probs = torch.abs(state) ** 2  # shape: same as state
 
@@ -240,6 +247,14 @@ class VQE(nn.Module):
                 return energy.real
             elif self.hamiltonian_pauli is not None:
                 # Pauli-sum Hamiltonian path
+                # Validate dimension match
+                expected_dim = 2 ** self.hamiltonian_pauli.n_qubits()
+                if state.shape[-1] != expected_dim:
+                    raise ValueError(
+                        f"State dimension {state.shape[-1]} does not match "
+                        f"PauliSum Hamiltonian dimension {expected_dim} "
+                        f"(2**{self.hamiltonian_pauli.n_qubits()})."
+                    )
                 energy = expectation_pauli_sum(state, self.hamiltonian_pauli)
                 return energy
             else:

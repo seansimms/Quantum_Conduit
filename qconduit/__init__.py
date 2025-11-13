@@ -55,6 +55,28 @@ from .noise import (
 # Gradients
 from .grad import param_shift_energy
 
+# Circuit IR
+from .circuit import GateOp, QuantumCircuit
+
+# Layers
+from .layers import HardwareEfficientAnsatz, ParametricAnsatz, QuantumBlock
+
+# Algorithms
+from .algorithms import VQE
+
+# Diagnostics
+from .diagnostics import (
+    state_norm,
+    assert_normalized,
+    is_hermitian,
+    assert_hermitian,
+    fidelity,
+    bloch_vector,
+    is_debug_enabled,
+    set_debug_enabled,
+    debug_context,
+)
+
 __all__ = [
     # Version
     "__version__",
@@ -100,4 +122,23 @@ __all__ = [
     "DepolarizingChannel",
     "AmplitudeDampingChannel",
     "PhaseDampingChannel",
+    # Circuit IR
+    "GateOp",
+    "QuantumCircuit",
+    # Layers
+    "ParametricAnsatz",
+    "HardwareEfficientAnsatz",
+    "QuantumBlock",
+    # Algorithms
+    "VQE",
+    # Diagnostics
+    "state_norm",
+    "assert_normalized",
+    "is_hermitian",
+    "assert_hermitian",
+    "fidelity",
+    "bloch_vector",
+    "is_debug_enabled",
+    "set_debug_enabled",
+    "debug_context",
 ]
