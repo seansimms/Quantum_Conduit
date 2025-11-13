@@ -5,21 +5,58 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "qconduit"
 version = "0.0.1"
-description = "Quantum Conduit - a PyTorch-native quantum statevector plumbing library"
+description = "A PyTorch-native quantum statevector plumbing library for quantum machine learning"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
-    {name = "Quantum Conduit Contributors", email = "contributors@qconduit.dev"}
+  {name = "Sean Simms", email = "seansimms00@gmail.com"}
+]
+maintainers = [
+  {name = "Sean Simms", email = "seansimms00@gmail.com"}
+]
+keywords = [
+  "quantum computing",
+  "quantum machine learning",
+  "pytorch",
+  "variational quantum algorithms",
+  "VQE",
+  "QAOA",
+  "quantum statevector",
+  "quantum simulation",
+  "quantum chemistry",
+  "quantum optimization"
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "torch>=2.1",
+  "torch>=2.1",
 ]
+[project.urls]
+Homepage = "https://github.com/seansimms/Quantum_Conduit"
+Documentation = "https://github.com/seansimms/Quantum_Conduit"
+Repository = "https://github.com/seansimms/Quantum_Conduit"
+"Bug Tracker" = "https://github.com/seansimms/Quantum_Conduit/issues"
+"Zenodo DOI" = "https://doi.org/10.5281/zenodo.17599984"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "ruff>=0.1.0",
+    "build>=1.0.0",
+    "twine>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
