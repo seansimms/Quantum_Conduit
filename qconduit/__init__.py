@@ -80,6 +80,17 @@ from .noise import (
     NoiseConfig,
     simulate_noisy_circuit_dm,
     sample_noisy_circuit_dm,
+    # New G11 APIs
+    KrausChannel,
+    bit_flip_channel,
+    phase_flip_channel,
+    bit_phase_flip_channel,
+    generalized_amplitude_damping_channel,
+    two_qubit_depolarizing_channel,
+    to_density_matrix,
+    apply_kraus_channel_to_density_matrix,
+    apply_kraus_channel_to_statevector,
+    compose_kraus_channels,
 )
 
 # Operators
@@ -122,6 +133,14 @@ from .time_evolution import (
     time_evolve_state,
     build_trotter_step_circuit,
     build_trotter_circuit,
+)
+
+# Evolution (G15: Hamiltonian Time Evolution & Trotterization)
+from .evolution import (
+    exact_time_evolution_statevector,
+    TrotterOrder,
+    TrotterSchedule,
+    evolve_state_trotter,
 )
 
 # Experiments
@@ -171,6 +190,51 @@ from .fermion import (
     FermionOperator,
     jordan_wigner,
     bravyi_kitaev,
+)
+
+# Measurement, sampling, and tomography
+from .measurement import (
+    basis_probabilities_from_statevector,
+    sample_bitstrings_from_probabilities,
+    sample_bitstrings_from_statevector,
+    bitstring_counts,
+    empirical_probabilities_from_bitstrings,
+    estimate_pauli_z_expectation_from_samples,
+    pauli_matrix_from_label,
+    pauli_expectation_from_statevector,
+    single_qubit_pauli_expectations_from_statevector,
+    reconstruct_single_qubit_density_from_pauli,
+    two_qubit_pauli_expectations_from_statevector,
+    reconstruct_two_qubit_density_from_pauli,
+)
+
+# Variational algorithms
+from .variational import (
+    VariationalAnsatz,
+    HardwareEfficientAnsatz,
+    LayeredEntanglerAnsatz,
+    QAOAAnsatz,
+    VQEResult,
+    evaluate_expectation_value,
+    run_vqe,
+    QAOAResult,
+    run_qaoa,
+)
+
+# Transpilation and decomposition
+from .transpile import (
+    decompose_h_to_rz_rx_rz,
+    decompose_x_to_rx,
+    decompose_y_to_ry,
+    decompose_z_to_rz,
+    decompose_rz_to_clifford_t,
+    decompose_gate_to_basis,
+    transpile_to_basis,
+    transpile_to_rx_rz_cx_basis,
+    transpile_to_clifford_t,
+    GateCountSummary,
+    summarize_gate_counts,
+    estimate_circuit_depth,
 )
 
 __all__ = [
@@ -231,6 +295,17 @@ __all__ = [
     "NoiseConfig",
     "simulate_noisy_circuit_dm",
     "sample_noisy_circuit_dm",
+    # New G11 APIs
+    "KrausChannel",
+    "bit_flip_channel",
+    "phase_flip_channel",
+    "bit_phase_flip_channel",
+    "generalized_amplitude_damping_channel",
+    "two_qubit_depolarizing_channel",
+    "to_density_matrix",
+    "apply_kraus_channel_to_density_matrix",
+    "apply_kraus_channel_to_statevector",
+    "compose_kraus_channels",
     # Circuit IR
     "GateOp",
     "QuantumCircuit",
@@ -277,6 +352,11 @@ __all__ = [
     "time_evolve_state",
     "build_trotter_step_circuit",
     "build_trotter_circuit",
+    # Evolution (G15: Hamiltonian Time Evolution & Trotterization)
+    "exact_time_evolution_statevector",
+    "TrotterOrder",
+    "TrotterSchedule",
+    "evolve_state_trotter",
     # Experiments
     "SweepResult1D",
     "SweepResult2D",
@@ -311,4 +391,41 @@ __all__ = [
     "FermionOperator",
     "jordan_wigner",
     "bravyi_kitaev",
+    # Measurement, sampling, and tomography
+    "basis_probabilities_from_statevector",
+    "sample_bitstrings_from_probabilities",
+    "sample_bitstrings_from_statevector",
+    "bitstring_counts",
+    "empirical_probabilities_from_bitstrings",
+    "estimate_pauli_z_expectation_from_samples",
+    "pauli_matrix_from_label",
+    "pauli_expectation_from_statevector",
+    "single_qubit_pauli_expectations_from_statevector",
+    "reconstruct_single_qubit_density_from_pauli",
+    "two_qubit_pauli_expectations_from_statevector",
+    "reconstruct_two_qubit_density_from_pauli",
+    # Variational algorithms
+    "VariationalAnsatz",
+    "HardwareEfficientAnsatz",
+    "LayeredEntanglerAnsatz",
+    "QAOAAnsatz",
+    "VQEResult",
+    "evaluate_expectation_value",
+    "run_vqe",
+    "QAOAResult",
+    "run_qaoa",
+    # Transpilation and decomposition
+    "decompose_h_to_rz_rx_rz",
+    "decompose_x_to_rx",
+    "decompose_y_to_ry",
+    "decompose_y_to_rz_rx_rz",
+    "decompose_z_to_rz",
+    "decompose_rz_to_clifford_t",
+    "decompose_gate_to_basis",
+    "transpile_to_basis",
+    "transpile_to_rx_rz_cx_basis",
+    "transpile_to_clifford_t",
+    "GateCountSummary",
+    "summarize_gate_counts",
+    "estimate_circuit_depth",
 ]
