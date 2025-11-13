@@ -7,6 +7,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.1+](https://img.shields.io/badge/PyTorch-2.1+-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI version](https://badge.fury.io/py/qconduit.svg)](https://badge.fury.io/py/qconduit)
 [![Version](https://img.shields.io/badge/version-0.0.1-blue.svg)](https://github.com/seansimms/Quantum_Conduit)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17599984.svg)](https://doi.org/10.5281/zenodo.17599984)
 
@@ -82,9 +83,19 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 - Python 3.10 or higher
 - PyTorch 2.1 or higher
 
-### Basic Installation
+### Install from PyPI (Recommended)
 
 ```bash
+pip install qconduit
+```
+
+### Install from Source
+
+For the latest development version:
+
+```bash
+git clone https://github.com/seansimms/Quantum_Conduit.git
+cd Quantum_Conduit
 pip install -e .
 ```
 
