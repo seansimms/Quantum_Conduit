@@ -10,6 +10,7 @@ from __future__ import annotations
 import torch
 
 import qconduit as qc
+from qconduit.layers import HardwareEfficientAnsatz
 
 
 def main() -> None:
@@ -28,7 +29,7 @@ def main() -> None:
     hamiltonian_diag = torch.tensor([0.0, 0.5, 0.5, 1.0], dtype=torch.float32)
 
     # Construct the ansatz
-    ansatz = qc.HardwareEfficientAnsatz(n_qubits=n_qubits, depth=depth)
+    ansatz = HardwareEfficientAnsatz(n_qubits=n_qubits, depth=depth)
 
     # Construct VQE
     vqe = qc.VQE(ansatz=ansatz, hamiltonian=hamiltonian_diag)

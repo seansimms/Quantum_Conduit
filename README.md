@@ -211,8 +211,8 @@ noise = DepolarizingChannel(p=0.1)  # 10% depolarizing noise
 rho = noise.apply_statevector(state, n_qubits=2)
 
 # Compute noisy expectation values
-from qconduit.backend.density_matrix import measure_probs_dm
-probs = measure_probs_dm(rho)
+import qconduit as qc
+probs = qc.measure_probs_dm(rho)
 print(f"Noisy probabilities: {probs}")
 ```
 
@@ -354,7 +354,7 @@ state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=3)
 state = qc.apply_gate(state, qc.H(), qubit=1, n_qubits=3)
 
 # Sample bitstrings from the state
-samples = sample_bitstrings_state(state, n_qubits=3, n_samples=1000)
+samples = sample_bitstrings_state(state, n_qubits=3, n_shots=1000)
 
 # Count occurrences
 counts = bitstring_counts(samples)
@@ -363,8 +363,11 @@ print(f"Sample counts: {counts}")
 # Compare probability distributions using KL divergence
 probs1 = qc.measure_probs(state, n_qubits=3)
 probs2 = qc.measure_probs(qc.zero_state(n_qubits=3), n_qubits=3)
-kl = kl_divergence(probs1, probs2)
-print(f"KL divergence: {kl.item():.6f}")
+# Convert probability tensors to dictionaries for kl_divergence
+probs1_dict = {format(i, f'0{3}b'): float(probs1[i].item()) for i in range(len(probs1))}
+probs2_dict = {format(i, f'0{3}b'): float(probs2[i].item()) for i in range(len(probs2))}
+kl = kl_divergence(probs1_dict, probs2_dict)
+print(f"KL divergence: {kl:.6f}")
 ```
 
 ### Example 10: Time Evolution
@@ -459,12 +462,16 @@ ising = ising_zz_chain(
 
 # Two-qubit chemistry-like model
 chemistry_ham = two_qubit_generic_chemistry_like(
-    h1_coeffs=[0.5, 0.3],  # One-body terms
-    h2_coeff=0.1  # Two-body interaction
+    c_i=0.0,      # Identity coefficient
+    c_z0=0.5,     # Z⊗I coefficient
+    c_z1=0.3,     # I⊗Z coefficient
+    c_z0z1=0.1,   # Z⊗Z coefficient
+    c_xx=0.0,     # X⊗X coefficient
+    c_yy=0.0      # Y⊗Y coefficient
 )
 
 # Diagonal Z field
-z_field = diagonal_z_field(n_qubits=3, field_strength=0.5)
+z_field = diagonal_z_field(num_qubits=3, local_fields=[0.5, 0.5, 0.5])
 
 # Use with VQE or exact diagonalization
 from qconduit.exact import exact_ground_state
@@ -489,7 +496,7 @@ import qconduit as qc
 import torch
 
 # Define initial (mixer) and final (problem) Hamiltonians
-h_mixer = build_x_mixer_hamiltonian(n_qubits=3)  # -sum_i X_i
+h_mixer = build_x_mixer_hamiltonian(num_qubits=3)  # -sum_i X_i
 h_problem = PauliSum.from_terms([
     PauliTerm(1.0, ("Z", "Z", "I")),
     PauliTerm(1.0, ("I", "Z", "Z")),
@@ -517,13 +524,12 @@ final_state = adiabatic_evolve_state(
     initial_state,
     h_mixer,
     h_problem,
-    config,
-    n_qubits=3
+    config
 )
 
 # Build adiabatic circuit for visualization
 circuit = build_adiabatic_circuit(
-    h_mixer, h_problem, config, n_qubits=3
+    n_qubits=3, h_mixer=h_mixer, h_problem=h_problem, config=config
 )
 print(circuit.to_text_diagram())
 ```
@@ -552,11 +558,11 @@ term2 = FermionTerm(
 fermion_op = FermionOperator([term1, term2])
 
 # Map to qubits using Jordan-Wigner transform
-jw_hamiltonian = jordan_wigner(fermion_op, n_modes=2)
+jw_hamiltonian = jordan_wigner(fermion_op, n_spin_orbitals=2)
 print(f"Jordan-Wigner: {len(jw_hamiltonian.terms)} Pauli terms")
 
 # Map to qubits using Bravyi-Kitaev transform
-bk_hamiltonian = bravyi_kitaev(fermion_op, n_modes=2)
+bk_hamiltonian = bravyi_kitaev(fermion_op, n_spin_orbitals=2)
 print(f"Bravyi-Kitaev: {len(bk_hamiltonian.terms)} Pauli terms")
 
 # Use the mapped Hamiltonian with VQE or exact diagonalization
@@ -580,10 +586,11 @@ circuit.add_gate("CNOT", [0, 1])
 circuit.add_gate("RX", [1], params=[0.5])
 
 # Configure noise: depolarizing noise on qubit 0, amplitude damping on qubit 1
+from qconduit.noise import AmplitudeDampingChannel
 noise_config = NoiseConfig(
     per_qubit_channels={
-        0: DepolarizingChannel(prob=0.01),  # 1% depolarizing on qubit 0
-        1: qc.AmplitudeDampingChannel(gamma=0.05),  # Amplitude damping on qubit 1
+        0: DepolarizingChannel(p=0.01),  # 1% depolarizing on qubit 0
+        1: AmplitudeDampingChannel(gamma=0.05),  # Amplitude damping on qubit 1
     }
 )
 
@@ -595,7 +602,7 @@ print(f"Density matrix shape: {rho.shape}")  # (4, 4)
 samples = sample_noisy_circuit_dm(
     circuit,
     noise=noise_config,
-    n_samples=1000
+    n_shots=1000
 )
 
 # Analyze results
@@ -666,9 +673,6 @@ hamiltonian = PauliSum.from_terms([
 ])
 
 # High-level VQE API
-from qconduit.variational import HardwareEfficientAnsatz
-import torch
-
 ansatz = HardwareEfficientAnsatz(num_qubits=2, num_layers=2)
 initial_params = torch.randn(ansatz.num_parameters)
 
@@ -822,16 +826,15 @@ evolved_exact = exact_time_evolution_statevector(
 from qconduit.evolution import TrotterOrder, TrotterSchedule
 
 schedule = TrotterSchedule(
-    dt=0.05,  # Time step
-    n_steps=10,  # Number of steps
-    order=TrotterOrder.FIRST,  # or TrotterOrder.SECOND
+    num_steps=10,     # Number of steps
+    total_time=0.5,   # Total evolution time
+    order=1,          # TrotterOrder.FIRST (1) or TrotterOrder.SECOND (2)
 )
 
 evolved_trotter = evolve_state_trotter(
     state,
     hamiltonian,
     schedule,
-    n_qubits=2,
 )
 
 # Compare results
@@ -1238,35 +1241,38 @@ from qconduit.sampling import (
 
 # Sample from statevector
 samples = sample_bitstrings_state(
-    state, n_qubits=3, n_samples=1000, qubits=None  # None = all qubits
+    state, n_qubits=3, n_shots=1000, qubits=None  # None = all qubits
 )
 
 # Sample from density matrix
-samples_dm = sample_bitstrings_dm(rho, n_qubits=3, n_samples=1000)
+samples_dm = sample_bitstrings_dm(rho, n_qubits=3, n_shots=1000)
 
 # Sample from circuit
 from qconduit.circuit import QuantumCircuit
 circuit = QuantumCircuit(n_qubits=2)
 circuit.add_gate("H", [0])
 circuit.add_gate("CNOT", [0, 1])
-samples_circuit = sample_bitstrings_circuit(circuit, n_samples=1000)
+samples_circuit = sample_bitstrings_circuit(circuit, n_shots=1000)
 
 # Sample from probability distribution
 probs = qc.measure_probs(state, n_qubits=3)
-samples = sample_from_probs(probs, n_samples=1000)
+samples = sample_from_probs(probs, n_qubits=3, n_shots=1000)
 
 # Count bitstring occurrences
 counts = bitstring_counts(samples)
 # Returns dict: {"000": 250, "001": 250, ...}
 
 # Convert counts to probabilities
-probs_from_counts = counts_to_probs(counts, n_qubits=3)
+probs_from_counts = counts_to_probs(counts)
 
 # Compute KL divergence between distributions
-kl = kl_divergence(probs1, probs2)
+# Convert probability tensors to dictionaries
+probs1_dict = {format(i, f'0{3}b'): float(probs1[i].item()) for i in range(len(probs1))}
+probs2_dict = {format(i, f'0{3}b'): float(probs2[i].item()) for i in range(len(probs2))}
+kl = kl_divergence(probs1_dict, probs2_dict)
 
 # Marginalize probabilities (sum over some qubits)
-marginal = marginalize_probs(probs, n_qubits=3, qubits=[0, 1])  # Keep qubits 0,1
+marginal = marginalize_probs(probs, n_qubits=3, qubits_to_keep=[0, 1])  # Keep qubits 0,1
 ```
 
 ### Time Evolution
@@ -1466,15 +1472,19 @@ ising = ising_zz_chain(
 # Two-qubit chemistry-like model
 # Generic two-qubit Hamiltonian for chemistry applications
 chemistry_ham = two_qubit_generic_chemistry_like(
-    h1_coeffs=[0.5, 0.3],  # One-body coefficients
-    h2_coeff=0.1,          # Two-body interaction coefficient
+    c_i=0.0,      # Identity coefficient
+    c_z0=0.5,     # Z⊗I coefficient
+    c_z1=0.3,     # I⊗Z coefficient
+    c_z0z1=0.1,   # Z⊗Z coefficient
+    c_xx=0.0,     # X⊗X coefficient
+    c_yy=0.0      # Y⊗Y coefficient
 )
 
 # Diagonal Z field
-# H = -field_strength * sum_i Z_i
+# H = sum_i h_i Z_i where h_i are the local field strengths
 z_field = diagonal_z_field(
-    n_qubits=3,
-    field_strength=0.5,
+    num_qubits=3,
+    local_fields=[0.5, 0.5, 0.5],  # Field strength for each qubit
 )
 ```
 
@@ -1504,7 +1514,7 @@ def custom_schedule(num_steps: int) -> torch.Tensor:
     return torch.linspace(0, 1, num_steps) ** 0.5
 
 # Build X mixer Hamiltonian: H_mixer = -sum_i X_i
-h_mixer = build_x_mixer_hamiltonian(n_qubits=3)
+h_mixer = build_x_mixer_hamiltonian(num_qubits=3)
 
 # Interpolate between two Hamiltonians
 h_interpolated = interpolate_paulisum(
@@ -1526,23 +1536,25 @@ final_state = adiabatic_evolve_state(
     initial_state,  # Initial statevector
     h_mixer,        # Initial (mixer) Hamiltonian
     h_problem,      # Final (problem) Hamiltonian
-    config,         # AdiabaticConfig
-    n_qubits=3,     # Number of qubits
+    config          # AdiabaticConfig
 )
 
 # Build adiabatic circuit
 circuit = build_adiabatic_circuit(
-    h_mixer,
-    h_problem,
-    config,
     n_qubits=3,
+    h_mixer=h_mixer,
+    h_problem=h_problem,
+    config=config
 )
 
 # Prepare ground state of X mixer (|+⟩^⊗n)
+initial_state = qc.zero_state(n_qubits=3)
+for i in range(3):
+    initial_state = qc.apply_gate(initial_state, qc.H(), qubit=i, n_qubits=3)
 ground_state = adiabatic_x_mixer_to_problem_state(
+    initial_state,
     h_problem,
-    config,
-    n_qubits=3,
+    config
 )
 ```
 
@@ -1575,13 +1587,13 @@ fermion_op = FermionOperator([term1, term2])
 # Map to qubits using Jordan-Wigner transform
 jw_hamiltonian = jordan_wigner(
     fermion_op,
-    n_modes=3,  # Number of fermionic modes (spin-orbitals)
+    n_spin_orbitals=3,  # Number of fermionic modes (spin-orbitals)
 )
 
 # Map to qubits using Bravyi-Kitaev transform
 bk_hamiltonian = bravyi_kitaev(
     fermion_op,
-    n_modes=3,
+    n_spin_orbitals=3,
 )
 
 # Both return PauliSum that can be used with VQE, exact diagonalization, etc.
@@ -1618,12 +1630,11 @@ evolved_trotter = evolve_state_trotter(
     state,
     hamiltonian,
     schedule,
-    n_qubits=2,
 )
 
 # Build Trotter circuits
-step_circuit = build_trotter_step_circuit(hamiltonian, schedule, n_qubits=2)
-full_circuit = build_trotter_circuit(hamiltonian, schedule, n_qubits=2)
+step_circuit = build_trotter_step_circuit(hamiltonian, schedule.step_time, schedule.order, num_qubits=2)
+full_circuit = build_trotter_circuit(hamiltonian, schedule, num_qubits=2)
 ```
 
 ### Measurement and Quantum State Tomography
@@ -1648,14 +1659,14 @@ from qconduit.measurement import (
 )
 
 # Get basis probabilities
-probs = basis_probabilities_from_statevector(state, n_qubits=2)
+probs = basis_probabilities_from_statevector(state)
 
 # Sample bitstrings
-samples = sample_bitstrings_from_statevector(state, n_qubits=2, n_samples=1000)
+samples = sample_bitstrings_from_statevector(state, n_shots=1000)
 
 # Compute Pauli expectation values
-ex_x = pauli_expectation_from_statevector(state, "X", n_qubits=1)
-ex_zz = pauli_expectation_from_statevector(state, "ZZ", n_qubits=2)
+ex_x = pauli_expectation_from_statevector(state, "X")
+ex_zz = pauli_expectation_from_statevector(state, "ZZ")
 
 # Single-qubit tomography
 ex_x, ex_y, ex_z = single_qubit_pauli_expectations_from_statevector(state)
@@ -1666,7 +1677,7 @@ pauli_expectations = two_qubit_pauli_expectations_from_statevector(state_2q)
 rho_2q = reconstruct_two_qubit_density_from_pauli(pauli_expectations)
 
 # Estimate expectation from samples
-z_expectation = estimate_pauli_z_expectation_from_samples(samples, qubit=0, n_qubits=2)
+z_expectation, std_error = estimate_pauli_z_expectation_from_samples(samples, qubit_index=0)
 ```
 
 ### Variational Algorithm Scaffolding
@@ -1722,9 +1733,9 @@ qaoa_result = run_qaoa(
 )
 
 # Evaluate expectation value for custom ansatz
-ansatz = HardwareEfficientAnsatz(n_qubits=3, depth=2)
+ansatz = HardwareEfficientAnsatz(num_qubits=3, num_layers=2)
 params = torch.randn(ansatz.num_parameters)
-energy = evaluate_expectation_value(ansatz, hamiltonian, params)
+energy = evaluate_expectation_value(ansatz, params, hamiltonian)
 ```
 
 ### Circuit Transpilation
@@ -1846,7 +1857,7 @@ from qconduit.circuit import QuantumCircuit
 # Configure per-qubit noise channels
 noise_config = NoiseConfig(
     per_qubit_channels={
-        0: DepolarizingChannel(prob=0.01),      # 1% depolarizing on qubit 0
+        0: DepolarizingChannel(p=0.01),      # 1% depolarizing on qubit 0
         1: AmplitudeDampingChannel(gamma=0.05), # Amplitude damping on qubit 1
         2: PhaseDampingChannel(gamma=0.02),     # Phase damping on qubit 2
     }
@@ -1867,7 +1878,7 @@ rho = simulate_noisy_circuit_dm(
 samples = sample_noisy_circuit_dm(
     circuit,
     noise=noise_config,
-    n_samples=1000,  # Number of samples
+    n_shots=1000,  # Number of samples
 )
 # Returns tensor of shape (n_samples, n_qubits) with bitstrings
 ```
@@ -2070,7 +2081,7 @@ print(f"Best energy: {history.best_energy()}")
 from qconduit.sampling import sample_bitstrings_state, bitstring_counts
 
 # Simulate 1000 measurements
-samples = sample_bitstrings_state(state, n_qubits=4, n_samples=1000)
+samples = sample_bitstrings_state(state, n_qubits=4, n_shots=1000)
 
 # Analyze measurement statistics
 counts = bitstring_counts(samples)
@@ -2086,7 +2097,7 @@ probs = qc.measure_probs(state, n_qubits=4)
 ```python
 # Sample only specific qubits
 samples = sample_bitstrings_state(
-    state, n_qubits=4, n_samples=1000, qubits=[0, 1]  # Only measure qubits 0,1
+    state, n_qubits=4, n_shots=1000, qubits=[0, 1]  # Only measure qubits 0,1
 )
 ```
 
@@ -2157,10 +2168,10 @@ rho_2q = reconstruct_two_qubit_density_from_pauli(pauli_expectations)
 from qconduit.measurement import estimate_pauli_z_expectation_from_samples
 
 # Sample bitstrings from state
-samples = sample_bitstrings_from_statevector(state, n_qubits=2, n_samples=10000)
+samples = sample_bitstrings_from_statevector(state, n_shots=10000)
 
 # Estimate Pauli-Z expectation from samples
-z_expectation = estimate_pauli_z_expectation_from_samples(samples, qubit=0, n_qubits=2)
+z_expectation, std_error = estimate_pauli_z_expectation_from_samples(samples, qubit_index=0)
 ```
 
 ### High-Level Variational Algorithms
@@ -2183,7 +2194,7 @@ result = run_vqe(
     max_iterations=200,
 )
 
-print(f"Ground state energy: {result.optimal_energy:.6f}")
+print(f"Ground state energy: {result.optimal_value:.6f}")
 print(f"Converged: {result.converged}")
 ```
 
@@ -2199,16 +2210,16 @@ qaoa_result = run_qaoa(
     max_iterations=150,
 )
 
-print(f"Optimal cost: {qaoa_result.optimal_energy:.6f}")
+print(f"Optimal cost: {qaoa_result.optimal_value:.6f}")
 ```
 
 **Custom ansätze with result objects:**
 ```python
 from qconduit.variational import HardwareEfficientAnsatz, evaluate_expectation_value
 
-ansatz = HardwareEfficientAnsatz(n_qubits=3, depth=2)
+ansatz = HardwareEfficientAnsatz(num_qubits=3, num_layers=2)
 params = torch.randn(ansatz.num_parameters)
-energy = evaluate_expectation_value(ansatz, hamiltonian, params)
+energy = evaluate_expectation_value(ansatz, params, hamiltonian)
 ```
 
 ### Circuit Transpilation for Hardware
@@ -2301,7 +2312,7 @@ schedule = TrotterSchedule(
     order=1,  # First-order Trotter
 )
 evolved_trotter = evolve_state_trotter(
-    state, hamiltonian, schedule, n_qubits=2
+    state, hamiltonian, schedule
 )
 
 # Compare fidelity
@@ -2429,7 +2440,7 @@ from qconduit.adiabatic import (
 )
 
 # Set up adiabatic evolution for optimization
-h_mixer = build_x_mixer_hamiltonian(n_qubits=4)
+h_mixer = build_x_mixer_hamiltonian(num_qubits=4)
 h_problem = your_problem_hamiltonian
 
 config = AdiabaticConfig(
@@ -2440,11 +2451,13 @@ config = AdiabaticConfig(
 )
 
 # Prepare initial state (ground state of mixer = |+⟩^⊗n)
-initial_state = prepare_plus_state(n_qubits=4)
+initial_state = qc.zero_state(n_qubits=4)
+for i in range(4):
+    initial_state = qc.apply_gate(initial_state, qc.H(), qubit=i, n_qubits=4)
 
 # Evolve adiabatically
 final_state = adiabatic_evolve_state(
-    initial_state, h_mixer, h_problem, config, n_qubits=4
+    initial_state, h_mixer, h_problem, config
 )
 
 # Measure to get solution
@@ -2487,7 +2500,7 @@ for p in range(n_orbitals):
 fermion_ham = FermionOperator(terms)
 
 # Map to qubits
-qubit_hamiltonian = jordan_wigner(fermion_ham, n_modes=n_orbitals)
+qubit_hamiltonian = jordan_wigner(fermion_ham, n_spin_orbitals=n_orbitals)
 
 # Use with VQE or exact diagonalization
 from qconduit.algorithms import VQE
@@ -2499,11 +2512,11 @@ vqe = VQE(ansatz=chemistry_ansatz, hamiltonian=qubit_hamiltonian)
 from qconduit.fermion import jordan_wigner, bravyi_kitaev
 
 # Jordan-Wigner typically has more Pauli terms but simpler structure
-jw_ham = jordan_wigner(fermion_op, n_modes=4)
+jw_ham = jordan_wigner(fermion_op, n_spin_orbitals=4)
 print(f"JW: {len(jw_ham.terms)} terms")
 
 # Bravyi-Kitaev often has fewer terms but more complex structure
-bk_ham = bravyi_kitaev(fermion_op, n_modes=4)
+bk_ham = bravyi_kitaev(fermion_op, n_spin_orbitals=4)
 print(f"BK: {len(bk_ham.terms)} terms")
 
 # Choose based on your hardware constraints
@@ -2519,8 +2532,8 @@ from qconduit.noise import DepolarizingChannel, AmplitudeDampingChannel
 # Model realistic noise from quantum hardware
 noise_config = NoiseConfig(
     per_qubit_channels={
-        0: DepolarizingChannel(prob=0.005),  # 0.5% gate error
-        1: DepolarizingChannel(prob=0.008),  # 0.8% gate error
+        0: DepolarizingChannel(p=0.005),  # 0.5% gate error
+        1: DepolarizingChannel(p=0.008),  # 0.8% gate error
         2: AmplitudeDampingChannel(gamma=0.01),  # T1 decay
     }
 )
@@ -2546,7 +2559,7 @@ fidelities = []
 
 for prob in noise_levels:
     noise = NoiseConfig(per_qubit_channels={
-        i: DepolarizingChannel(prob=prob) for i in range(n_qubits)
+        i: DepolarizingChannel(p=prob) for i in range(n_qubits)
     })
     rho = simulate_noisy_circuit_dm(circuit, noise=noise)
     f = fidelity(ideal_rho, rho)
