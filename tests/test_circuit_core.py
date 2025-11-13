@@ -165,3 +165,115 @@ def test_circuit_depth_parallel() -> None:
     # All gates act on different qubits, so can be parallel: depth 1
     assert circuit.depth() == 1
 
+
+class TestCircuitBuildingSemantics:
+    """Comprehensive tests for circuit building semantics."""
+
+    def test_circuit_h_only_on_one_qubit(self):
+        """Test H-only circuit on one qubit matches statevector backend."""
+        circuit = QuantumCircuit(n_qubits=1)
+        circuit.add_gate("H", [0])
+
+        state_circuit = circuit.simulate_state()
+
+        # Compare with direct backend
+        import qconduit as qc
+        from qconduit.backend.statevector import apply_gate
+
+        state_backend = qc.zero_state(n_qubits=1)
+        h_gate = qc.H()
+        state_backend = apply_gate(state_backend, h_gate, qubit=0, n_qubits=1)
+
+        assert torch.allclose(state_circuit, state_backend, atol=1e-6)
+
+    def test_circuit_bell_state_matches_backend(self):
+        """Test Bell-state circuit matches statevector backend reference."""
+        circuit = QuantumCircuit(n_qubits=2)
+        circuit.add_gate("H", [0])
+        circuit.add_gate("CNOT", [0, 1])
+
+        state_circuit = circuit.simulate_state()
+
+        # Compare with direct backend
+        import qconduit as qc
+        from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate
+
+        state_backend = qc.zero_state(n_qubits=2)
+        h_gate = qc.H()
+        state_backend = apply_gate(state_backend, h_gate, qubit=0, n_qubits=2)
+        cnot = qc.CNOT(control_first=True)
+        state_backend = apply_two_qubit_gate(
+            state_backend, cnot, qubit1=0, qubit2=1, n_qubits=2
+        )
+
+        assert torch.allclose(state_circuit, state_backend, atol=1e-6)
+
+    def test_circuit_gate_counts_match_expected(self):
+        """Test gate_counts matches expected values for simple circuits."""
+        circuit = QuantumCircuit(n_qubits=2)
+        circuit.add_gate("H", [0])
+        circuit.add_gate("H", [1])
+        circuit.add_gate("CNOT", [0, 1])
+        circuit.add_gate("X", [0])
+
+        counts = circuit.gate_counts()
+        assert counts["H"] == 2
+        assert counts["CNOT"] == 1
+        assert counts["X"] == 1
+
+    def test_circuit_depth_matches_expected(self):
+        """Test depth matches expected values for simple circuits."""
+        circuit = QuantumCircuit(n_qubits=2)
+        circuit.add_gate("H", [0])
+        circuit.add_gate("H", [1])  # Parallel with previous H
+        circuit.add_gate("CNOT", [0, 1])  # Next layer
+        circuit.add_gate("X", [0])  # Next layer (qubit 0 was used in CNOT)
+
+        # Expected depth: H gates (layer 1), CNOT (layer 2), X (layer 3)
+        assert circuit.depth() == 3
+
+    def test_circuit_text_diagram_exact_match(self):
+        """Test to_text_diagram produces expected textual diagram for small circuits."""
+        circuit = QuantumCircuit(n_qubits=2)
+        circuit.add_gate("H", [0])
+        circuit.add_gate("CNOT", [0, 1])
+
+        diag = circuit.to_text_diagram()
+
+        # Should contain expected substrings
+        assert "q0:" in diag
+        assert "q1:" in diag
+        assert "H" in diag
+        assert "●" in diag  # Control
+        assert "⊕" in diag  # Target
+
+    def test_circuit_ghz_state_preparation(self):
+        """Test 3-qubit GHZ circuit matches direct backend composition."""
+        circuit = QuantumCircuit(n_qubits=3)
+        circuit.add_gate("H", [0])
+        circuit.add_gate("CNOT", [0, 1])
+        circuit.add_gate("CNOT", [1, 2])
+
+        state_circuit = circuit.simulate_state()
+
+        # Compare with direct backend
+        import qconduit as qc
+        from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate
+
+        state_backend = qc.zero_state(n_qubits=3)
+        h_gate = qc.H()
+        state_backend = apply_gate(state_backend, h_gate, qubit=0, n_qubits=3)
+        cnot = qc.CNOT(control_first=True)
+        state_backend = apply_two_qubit_gate(
+            state_backend, cnot, qubit1=0, qubit2=1, n_qubits=3
+        )
+        state_backend = apply_two_qubit_gate(
+            state_backend, cnot, qubit1=1, qubit2=2, n_qubits=3
+        )
+
+        # Compare up to global phase
+        inner = (state_circuit.conj() * state_backend).sum()
+        global_phase = inner / inner.abs()
+        phased = state_backend * global_phase.conj()
+        assert torch.allclose(state_circuit, phased, atol=1e-5)
+

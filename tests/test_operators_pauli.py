@@ -215,3 +215,83 @@ class TestPauliSum:
         with pytest.raises(ValueError, match="only intended for small systems"):
             hamiltonian.to_matrix()
 
+
+class TestPauliSumMatrixConversion:
+    """Comprehensive tests for PauliSum matrix conversion."""
+
+    def test_pauli_sum_to_matrix_z_on_one_qubit(self):
+        """Test H = Z on 1 qubit matches diag(1, -1)."""
+        term = PauliTerm(1.0, ("Z",))
+        H = PauliSum.from_terms([term])
+        matrix = H.to_matrix()
+
+        expected = torch.tensor([[1.0, 0.0], [0.0, -1.0]], dtype=torch.complex64)
+        assert torch.allclose(matrix, expected, atol=1e-6)
+
+    def test_pauli_sum_to_matrix_zz_on_two_qubits(self):
+        """Test H = Z⊗Z matches diag(1, -1, -1, 1)."""
+        term = PauliTerm(1.0, ("Z", "Z"))
+        H = PauliSum.from_terms([term])
+        matrix = H.to_matrix()
+
+        expected = torch.tensor(
+            [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [0.0, 0.0, 0.0, 1.0]],
+            dtype=torch.complex64,
+        )
+        assert torch.allclose(matrix, expected, atol=1e-6)
+
+    def test_pauli_sum_commuting_hamiltonians(self):
+        """Test that commuting Hamiltonians have [H1, H2] = 0."""
+        # H1 = Z on qubit 0
+        term1 = PauliTerm(1.0, ("Z", "I"))
+        H1 = PauliSum.from_terms([term1])
+
+        # H2 = Z on qubit 1
+        term2 = PauliTerm(1.0, ("I", "Z"))
+        H2 = PauliSum.from_terms([term2])
+
+        # Compute commutator [H1, H2] = H1 @ H2 - H2 @ H1
+        M1 = H1.to_matrix()
+        M2 = H2.to_matrix()
+        commutator = M1 @ M2 - M2 @ M1
+
+        # Should be zero (commuting)
+        assert torch.allclose(commutator, torch.zeros_like(commutator), atol=1e-6)
+
+    def test_pauli_sum_non_commuting_hamiltonians(self):
+        """Test that non-commuting Hamiltonians have [H1, H2] ≠ 0."""
+        # H1 = X on qubit 0
+        term1 = PauliTerm(1.0, ("X", "I"))
+        H1 = PauliSum.from_terms([term1])
+
+        # H2 = Z on qubit 0
+        term2 = PauliTerm(1.0, ("Z", "I"))
+        H2 = PauliSum.from_terms([term2])
+
+        # Compute commutator
+        M1 = H1.to_matrix()
+        M2 = H2.to_matrix()
+        commutator = M1 @ M2 - M2 @ M1
+
+        # Should not be zero (non-commuting)
+        assert not torch.allclose(commutator, torch.zeros_like(commutator), atol=1e-6)
+
+    def test_pauli_sum_commuting_zz_terms(self):
+        """Test that sums of Z or ZZ terms commute."""
+        # H1 = Z₀ + Z₁
+        term1 = PauliTerm(1.0, ("Z", "I"))
+        term2 = PauliTerm(1.0, ("I", "Z"))
+        H1 = PauliSum.from_terms([term1, term2])
+
+        # H2 = Z₀Z₁
+        term3 = PauliTerm(1.0, ("Z", "Z"))
+        H2 = PauliSum.from_terms([term3])
+
+        # Compute commutator
+        M1 = H1.to_matrix()
+        M2 = H2.to_matrix()
+        commutator = M1 @ M2 - M2 @ M1
+
+        # Should be zero (all Z terms commute)
+        assert torch.allclose(commutator, torch.zeros_like(commutator), atol=1e-6)
+

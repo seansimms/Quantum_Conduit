@@ -49,17 +49,27 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 
 - **📊 Parametric Ansätze**: Hardware-efficient and custom ansätze for variational algorithms
 - **🔍 VQE Algorithm**: Built-in Variational Quantum Eigensolver for ground-state energy estimation
+- **🎯 QAOA Algorithm**: Quantum Approximate Optimization Algorithm for MaxCut/Ising problems
+- **🌡️ Adiabatic Evolution**: Adiabatic quantum computing with configurable schedules and circuit building
 - **🤖 Hybrid Quantum-Classical**: Seamless integration with PyTorch neural networks
 - **📈 Parameter-Shift Gradients**: Quantum-aware gradient computation via parameter-shift rule
 - **🔄 Full Autograd Support**: Native PyTorch differentiation throughout the stack
+- **🏋️ Training Infrastructure**: Complete VQE training loop with callbacks and history tracking
 
 ### Advanced Features
 
 - **🎯 Pauli Operators**: Complete support for Pauli-term and Pauli-sum Hamiltonians
-- **🌪️ Noise Models**: Standard quantum channels (depolarizing, amplitude damping, phase damping)
+- **🌪️ Noise Models**: Standard quantum channels and circuit-level noise simulation with NoiseConfig
 - **📦 Batch Processing**: Efficient batch operations for training quantum models
 - **🎨 Extensible Design**: Clean abstractions for custom gates, ansätze, and algorithms
 - **🐛 Debug Mode**: Built-in debugging with normalization checks and validation
+- **🎲 Sampling Utilities**: Bitstring sampling and probability distribution analysis
+- **⏱️ Time Evolution**: Trotterization and Hamiltonian time evolution
+- **⚙️ Optimizer Factory**: Convenient optimizer creation utilities
+- **🔬 Experimental Tools**: Parameter sweep utilities for algorithm exploration
+- **🔬 Exact Solvers**: Exact diagonalization for benchmarking and validation (small systems)
+- **🏗️ Pre-built Models**: Standard quantum many-body models (spin chains, chemistry models)
+- **🧬 Fermion-to-Qubit Mappings**: Jordan-Wigner and Bravyi-Kitaev transforms for quantum chemistry
 
 ## Installation
 
@@ -256,6 +266,329 @@ with qc.debug_context(True):
 # Debug mode restored to previous state
 ```
 
+### Example 7: QAOA for MaxCut
+
+```python
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian, Edge, VQE
+import torch
+
+# Define a graph (triangle: 3 nodes, 3 edges)
+edges = [Edge(0, 1), Edge(1, 2), Edge(2, 0)]
+hamiltonian = ising_maxcut_hamiltonian(num_nodes=3, edges=edges)
+
+# Create QAOA ansatz (p is the number of QAOA layers)
+qaoa = QAOAAnsatz(n_qubits=3, problem_hamiltonian=hamiltonian, p=2)
+
+# Optimize with VQE
+vqe = VQE(ansatz=qaoa, hamiltonian=hamiltonian)
+params = torch.nn.Parameter(0.1 * torch.randn(qaoa.num_parameters))
+
+optimizer = torch.optim.Adam([params], lr=0.1)
+for step in range(50):
+    optimizer.zero_grad()
+    energy = vqe.energy(params)
+    energy.backward()
+    optimizer.step()
+    if (step + 1) % 10 == 0:
+        print(f"Step {step + 1}: energy = {energy.item():.6f}")
+```
+
+### Example 8: VQE Training with Callbacks
+
+```python
+from qconduit.training import VQETrainer, TrainingCallback, EarlyStoppingConfig
+from qconduit.algorithms import VQE
+import torch
+
+# Define callback for logging
+class LoggingCallback(TrainingCallback):
+    def __call__(self, info):
+        if info.step % 10 == 0:
+            print(f"Step {info.step}: energy = {info.energy:.6f}")
+
+# Configure early stopping
+early_stop = EarlyStoppingConfig(patience=10, min_delta=1e-6)
+
+# Create VQE and optimizer
+vqe = VQE(ansatz=ansatz, hamiltonian=hamiltonian)
+params = torch.nn.Parameter(0.1 * torch.randn(ansatz.num_parameters))
+optimizer = torch.optim.Adam([params], lr=0.1)
+
+# Train VQE with callbacks and early stopping
+trainer = VQETrainer(vqe, optimizer=optimizer)
+history = trainer.train(
+    params,
+    max_steps=100,
+    callbacks=[LoggingCallback()],
+    early_stopping=early_stop,
+)
+
+print(f"Best energy: {history.best_energy():.6f}")
+print(f"Final energy: {history.final_energy():.6f}")
+```
+
+### Example 9: Sampling and Analysis
+
+```python
+from qconduit.sampling import sample_bitstrings_state, bitstring_counts, kl_divergence
+import qconduit as qc
+
+# Create a quantum state
+state = qc.zero_state(n_qubits=3)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=3)
+state = qc.apply_gate(state, qc.H(), qubit=1, n_qubits=3)
+
+# Sample bitstrings from the state
+samples = sample_bitstrings_state(state, n_qubits=3, n_samples=1000)
+
+# Count occurrences
+counts = bitstring_counts(samples)
+print(f"Sample counts: {counts}")
+
+# Compare probability distributions using KL divergence
+probs1 = qc.measure_probs(state, n_qubits=3)
+probs2 = qc.measure_probs(qc.zero_state(n_qubits=3), n_qubits=3)
+kl = kl_divergence(probs1, probs2)
+print(f"KL divergence: {kl.item():.6f}")
+```
+
+### Example 10: Time Evolution
+
+```python
+from qconduit.time_evolution import time_evolve_state, build_trotter_circuit
+from qconduit.operators import PauliTerm, PauliSum
+import qconduit as qc
+
+# Create a simple Hamiltonian (transverse field Ising model)
+hamiltonian = PauliSum.from_terms([
+    PauliTerm(1.0, ("Z", "Z")),  # Interaction
+    PauliTerm(0.5, ("X", "I")),  # Transverse field
+    PauliTerm(0.5, ("I", "X")),
+])
+
+# Evolve state under the Hamiltonian
+state = qc.zero_state(n_qubits=2)
+evolved_state = time_evolve_state(
+    state, hamiltonian, t=0.5, n_steps=10, n_qubits=2
+)
+
+# Build Trotter circuit for the same evolution
+circuit = build_trotter_circuit(
+    hamiltonian, t=0.5, n_steps=10, n_qubits=2, order=1  # First-order Trotter
+)
+state_from_circuit = circuit.simulate_state()
+
+print("Time evolution complete")
+```
+
+### Example 11: Exact Diagonalization
+
+```python
+from qconduit.exact import exact_eigensystem, exact_ground_state, paulisum_to_dense
+from qconduit.operators import PauliTerm, PauliSum
+import torch
+
+# Create a simple Hamiltonian
+hamiltonian = PauliSum.from_terms([
+    PauliTerm(1.0, ("Z", "Z")),
+    PauliTerm(0.5, ("X", "I")),
+    PauliTerm(0.5, ("I", "X")),
+])
+
+# Convert to dense matrix
+dense_matrix = paulisum_to_dense(hamiltonian, num_qubits=2)
+print(f"Dense matrix shape: {dense_matrix.shape}")  # (4, 4)
+
+# Compute full eigensystem
+eigenvalues, eigenvectors = exact_eigensystem(hamiltonian, num_qubits=2)
+print(f"Eigenvalues: {eigenvalues}")
+
+# Get just the ground state
+ground_energy, ground_state = exact_ground_state(hamiltonian, num_qubits=2)
+print(f"Ground state energy: {ground_energy.item():.6f}")
+```
+
+### Example 12: Pre-built Models
+
+```python
+from qconduit.models import (
+    transverse_field_ising_chain,
+    heisenberg_xxz_chain,
+    ising_zz_chain,
+    two_qubit_generic_chemistry_like,
+    diagonal_z_field,
+)
+
+# Transverse field Ising model (TFIM)
+tfim = transverse_field_ising_chain(
+    num_sites=4,
+    j_coupling=1.0,
+    h_field=0.5,
+    periodic=True  # Periodic boundary conditions
+)
+
+# Heisenberg XXZ chain
+heisenberg = heisenberg_xxz_chain(
+    num_sites=3,
+    j_coupling=1.0,
+    delta=0.5,  # Anisotropy parameter
+    periodic=False
+)
+
+# Ising ZZ chain (no transverse field)
+ising = ising_zz_chain(
+    num_sites=4,
+    j_coupling=1.0,
+    periodic=True
+)
+
+# Two-qubit chemistry-like model
+chemistry_ham = two_qubit_generic_chemistry_like(
+    h1_coeffs=[0.5, 0.3],  # One-body terms
+    h2_coeff=0.1  # Two-body interaction
+)
+
+# Diagonal Z field
+z_field = diagonal_z_field(n_qubits=3, field_strength=0.5)
+
+# Use with VQE or exact diagonalization
+from qconduit.exact import exact_ground_state
+energy, state = exact_ground_state(tfim, num_qubits=4)
+print(f"TFIM ground energy: {energy.item():.6f}")
+```
+
+### Example 13: Adiabatic Evolution
+
+```python
+from qconduit.adiabatic import (
+    AdiabaticConfig,
+    linear_schedule,
+    polynomial_schedule,
+    adiabatic_evolve_state,
+    build_adiabatic_circuit,
+    build_x_mixer_hamiltonian,
+    interpolate_paulisum,
+)
+from qconduit.operators import PauliSum, PauliTerm
+import qconduit as qc
+import torch
+
+# Define initial (mixer) and final (problem) Hamiltonians
+h_mixer = build_x_mixer_hamiltonian(n_qubits=3)  # -sum_i X_i
+h_problem = PauliSum.from_terms([
+    PauliTerm(1.0, ("Z", "Z", "I")),
+    PauliTerm(1.0, ("I", "Z", "Z")),
+])
+
+# Create schedule (linear interpolation)
+num_steps = 20
+schedule = linear_schedule(num_steps)
+
+# Configure adiabatic evolution
+config = AdiabaticConfig(
+    total_time=1.0,
+    num_steps=num_steps,
+    schedule=schedule,
+    trotter_steps_per_interval=5
+)
+
+# Evolve state adiabatically
+initial_state = qc.zero_state(n_qubits=3)
+# Prepare |+⟩^⊗n state
+for i in range(3):
+    initial_state = qc.apply_gate(initial_state, qc.H(), qubit=i, n_qubits=3)
+
+final_state = adiabatic_evolve_state(
+    initial_state,
+    h_mixer,
+    h_problem,
+    config,
+    n_qubits=3
+)
+
+# Build adiabatic circuit for visualization
+circuit = build_adiabatic_circuit(
+    h_mixer, h_problem, config, n_qubits=3
+)
+print(circuit.to_text_diagram())
+```
+
+### Example 14: Fermion-to-Qubit Mappings
+
+```python
+from qconduit.fermion import (
+    FermionOperator,
+    FermionTerm,
+    FermionOpSymbol,
+    jordan_wigner,
+    bravyi_kitaev,
+)
+
+# Create a fermionic operator (e.g., a^†_0 a_1 + a^†_1 a_0)
+term1 = FermionTerm(
+    coeff=1.0,
+    operators=((0, "+"), (1, "-"))  # a^†_0 a_1
+)
+term2 = FermionTerm(
+    coeff=1.0,
+    operators=((1, "+"), (0, "-"))  # a^†_1 a_0
+)
+
+fermion_op = FermionOperator([term1, term2])
+
+# Map to qubits using Jordan-Wigner transform
+jw_hamiltonian = jordan_wigner(fermion_op, n_modes=2)
+print(f"Jordan-Wigner: {len(jw_hamiltonian.terms)} Pauli terms")
+
+# Map to qubits using Bravyi-Kitaev transform
+bk_hamiltonian = bravyi_kitaev(fermion_op, n_modes=2)
+print(f"Bravyi-Kitaev: {len(bk_hamiltonian.terms)} Pauli terms")
+
+# Use the mapped Hamiltonian with VQE or exact diagonalization
+from qconduit.exact import exact_ground_state
+energy, state = exact_ground_state(jw_hamiltonian, num_qubits=2)
+print(f"Ground energy: {energy.item():.6f}")
+```
+
+### Example 15: Noisy Circuit Simulation
+
+```python
+from qconduit.noise import NoiseConfig, simulate_noisy_circuit_dm, sample_noisy_circuit_dm
+from qconduit.circuit import QuantumCircuit
+from qconduit.noise import DepolarizingChannel
+import qconduit as qc
+
+# Create a quantum circuit
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+circuit.add_gate("RX", [1], params=[0.5])
+
+# Configure noise: depolarizing noise on qubit 0, amplitude damping on qubit 1
+noise_config = NoiseConfig(
+    per_qubit_channels={
+        0: DepolarizingChannel(prob=0.01),  # 1% depolarizing on qubit 0
+        1: qc.AmplitudeDampingChannel(gamma=0.05),  # Amplitude damping on qubit 1
+    }
+)
+
+# Simulate noisy circuit (returns density matrix)
+rho = simulate_noisy_circuit_dm(circuit, noise=noise_config)
+print(f"Density matrix shape: {rho.shape}")  # (4, 4)
+
+# Sample bitstrings from noisy circuit
+samples = sample_noisy_circuit_dm(
+    circuit,
+    noise=noise_config,
+    n_samples=1000
+)
+
+# Analyze results
+from qconduit.sampling import bitstring_counts
+counts = bitstring_counts(samples)
+print(f"Sample distribution: {counts}")
+```
+
 ## Architecture
 
 ### Design Principles
@@ -277,11 +610,20 @@ qconduit/
 ├── gates/          # Standard quantum gates
 ├── circuit/        # Circuit IR (GateOp, QuantumCircuit)
 ├── layers/         # Parametric ansätze and hybrid blocks
-├── algorithms/     # Quantum algorithms (VQE)
+├── algorithms/     # Quantum algorithms (VQE, QAOA)
 ├── operators/      # Pauli operators and expectations
 ├── grad/           # Gradient computation (parameter-shift)
 ├── noise/          # Noise models and quantum channels
-└── diagnostics/    # State validation and debugging tools
+├── diagnostics/    # State validation and debugging tools
+├── training/       # Training loops and utilities
+├── sampling/       # Bitstring sampling and analysis
+├── time_evolution/ # Trotterization and time evolution
+├── optim/          # Optimizer factory utilities
+├── experiments/    # Parameter sweep utilities
+├── exact/          # Exact diagonalization for small systems
+├── models/         # Pre-built quantum many-body models
+├── adiabatic/      # Adiabatic quantum computing
+└── fermion/        # Fermion-to-qubit mappings
 ```
 
 ### Key Components
@@ -293,6 +635,15 @@ qconduit/
 - **Module System**: `QuantumModule` base class compatible with PyTorch's module system
 - **Circuit IR**: Structured circuit representation with simulation and visualization
 - **Diagnostics**: State validation, fidelity computation, and debug mode integration
+- **Training Infrastructure**: Complete training loops with callbacks and history tracking
+- **Sampling**: Bitstring sampling and probability distribution analysis
+- **Time Evolution**: Trotterization for Hamiltonian simulation
+- **Optimizers**: Factory utilities for optimizer creation
+- **Experiments**: Parameter sweep utilities for algorithm exploration
+- **Exact Solvers**: Exact diagonalization for benchmarking and validation
+- **Pre-built Models**: Standard quantum many-body models (spin chains, chemistry)
+- **Adiabatic Evolution**: Adiabatic quantum computing with configurable schedules
+- **Fermion-to-Qubit Mappings**: Jordan-Wigner and Bravyi-Kitaev transforms
 
 ## Examples
 
@@ -538,6 +889,485 @@ with debug_context(True):
 # Environment variable: QCONDUIT_DEBUG=1 enables debug mode at startup
 ```
 
+### QAOA
+
+```python
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian, Edge
+
+# Define graph edges
+edges = [Edge(0, 1, weight=1.0), Edge(1, 2, weight=0.5)]
+# Or use tuples: edges = [(0, 1), (1, 2)]
+
+# Build MaxCut Ising Hamiltonian
+hamiltonian = ising_maxcut_hamiltonian(
+    num_nodes=3,
+    edges=edges,
+    include_constant=True  # Include constant term in Hamiltonian
+)
+
+# Create QAOA ansatz (p is the number of QAOA layers)
+qaoa = QAOAAnsatz(n_qubits=3, problem_hamiltonian=hamiltonian, p=2)
+params = torch.randn(qaoa.num_parameters)
+state = qaoa(params)  # Forward pass
+
+# Use with VQE for optimization
+from qconduit.algorithms import VQE
+vqe = VQE(ansatz=qaoa, hamiltonian=hamiltonian)
+energy = vqe.energy(params)
+```
+
+### Training
+
+```python
+from qconduit.training import (
+    VQETrainer,
+    TrainingHistory,
+    TrainingCallback,
+    TrainingStepInfo,
+    EarlyStoppingConfig,
+)
+
+# Create trainer
+trainer = VQETrainer(vqe, optimizer=optimizer)
+
+# Define custom callback
+class MyCallback(TrainingCallback):
+    def __call__(self, info: TrainingStepInfo):
+        # Access step, epoch, energy, loss, grad_norm, param_norm
+        if info.step % 10 == 0:
+            print(f"Step {info.step}: energy={info.energy:.6f}")
+
+# Configure early stopping
+early_stop = EarlyStoppingConfig(
+    patience=10,      # Stop if no improvement for 10 steps
+    min_delta=1e-6,   # Minimum change to count as improvement
+)
+
+# Train with callbacks and early stopping
+history = trainer.train(
+    params,
+    max_steps=100,
+    callbacks=[MyCallback()],
+    early_stopping=early_stop,
+)
+
+# Access training history
+best_energy = history.best_energy()
+final_energy = history.final_energy()
+num_steps = history.num_steps()
+
+# Access individual steps
+for step_info in history.steps:
+    print(f"Step {step_info.step}: energy={step_info.energy}")
+```
+
+### Sampling
+
+```python
+from qconduit.sampling import (
+    sample_bitstrings_state,
+    sample_bitstrings_dm,
+    sample_bitstrings_circuit,
+    sample_from_probs,
+    bitstring_counts,
+    counts_to_probs,
+    kl_divergence,
+    marginalize_probs,
+)
+
+# Sample from statevector
+samples = sample_bitstrings_state(
+    state, n_qubits=3, n_samples=1000, qubits=None  # None = all qubits
+)
+
+# Sample from density matrix
+samples_dm = sample_bitstrings_dm(rho, n_qubits=3, n_samples=1000)
+
+# Sample from circuit
+from qconduit.circuit import QuantumCircuit
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+samples_circuit = sample_bitstrings_circuit(circuit, n_samples=1000)
+
+# Sample from probability distribution
+probs = qc.measure_probs(state, n_qubits=3)
+samples = sample_from_probs(probs, n_samples=1000)
+
+# Count bitstring occurrences
+counts = bitstring_counts(samples)
+# Returns dict: {"000": 250, "001": 250, ...}
+
+# Convert counts to probabilities
+probs_from_counts = counts_to_probs(counts, n_qubits=3)
+
+# Compute KL divergence between distributions
+kl = kl_divergence(probs1, probs2)
+
+# Marginalize probabilities (sum over some qubits)
+marginal = marginalize_probs(probs, n_qubits=3, qubits=[0, 1])  # Keep qubits 0,1
+```
+
+### Time Evolution
+
+```python
+from qconduit.time_evolution import (
+    time_evolve_state,
+    trotter_step_pauli_sum,
+    build_trotter_step_circuit,
+    build_trotter_circuit,
+    OrderLiteral,
+)
+
+# Evolve state under Hamiltonian
+evolved_state = time_evolve_state(
+    state,
+    hamiltonian,  # PauliSum
+    t=0.5,        # Total evolution time
+    n_steps=10,   # Number of Trotter steps
+    n_qubits=2,   # Number of qubits
+)
+
+# Single Trotter step
+state_after_step = trotter_step_pauli_sum(
+    state, hamiltonian, dt=0.05, n_qubits=2, order=1  # order: 1 or 2
+)
+
+# Build Trotter circuit (for visualization or reuse)
+circuit = build_trotter_circuit(
+    hamiltonian,
+    t=0.5,
+    n_steps=10,
+    n_qubits=2,
+    order=1,  # or OrderLiteral.FIRST (1 or 2)
+)
+
+# Build single Trotter step circuit
+step_circuit = build_trotter_step_circuit(
+    hamiltonian, dt=0.05, n_qubits=2, order=1
+)
+```
+
+### Optimizers
+
+```python
+from qconduit.optim import OptimConfig, create_optimizer
+
+# Create optimizer configuration
+config = OptimConfig(
+    name="adam",      # Optimizer name: "adam", "sgd", "rmsprop", etc.
+    lr=0.01,          # Learning rate
+    weight_decay=0.0, # Weight decay (L2 regularization)
+    # Additional optimizer-specific kwargs
+    betas=(0.9, 0.999),  # For Adam
+)
+
+# Create optimizer from parameters
+params = [torch.nn.Parameter(torch.randn(5))]
+optimizer = create_optimizer(config, params)
+
+# Use with training
+for step in range(100):
+    optimizer.zero_grad()
+    loss = compute_loss(params)
+    loss.backward()
+    optimizer.step()
+```
+
+### Experiments
+
+```python
+from qconduit.experiments import (
+    run_1d_sweep,
+    run_2d_sweep,
+    sweep_vqe_1d,
+    sweep_vqe_2d,
+    SweepResult1D,
+    SweepResult2D,
+)
+
+# Generic 1D parameter sweep
+def objective(params):
+    return params[0] ** 2
+
+result_1d = run_1d_sweep(
+    objective,
+    points=torch.linspace(0, 1, 50),
+    base_params=torch.tensor([0.0]),  # Base parameter tensor
+    index=0,  # Index of parameter to sweep
+    metadata={"param_name": "x", "x_label": "Parameter"},
+)
+
+# Access results
+print(f"Best value: {result_1d.values.min()}")
+print(f"Best point: {result_1d.points[result_1d.values.argmin()]}")
+
+# VQE-specific 1D sweep
+vqe_result = sweep_vqe_1d(
+    vqe,
+    points=torch.linspace(0, 2 * torch.pi, 50),
+    base_params=params_template,  # Template parameter tensor
+    index=0,  # Index of parameter to sweep
+)
+
+# 2D parameter sweep
+def objective_2d(params):
+    return params[0] ** 2 + params[1] ** 2
+
+result_2d = run_2d_sweep(
+    objective_2d,
+    x_points=torch.linspace(0, 1, 20),
+    y_points=torch.linspace(0, 1, 20),
+    metadata={"x_label": "X", "y_label": "Y"},
+)
+
+# Access 2D results
+print(f"Values shape: {result_2d.values.shape}")  # (20, 20)
+print(f"Best value: {result_2d.values.min()}")
+```
+
+### Exact Solvers
+
+```python
+from qconduit.exact import (
+    paulisum_to_dense,
+    exact_eigensystem,
+    exact_ground_state,
+)
+
+# Convert PauliSum to dense matrix
+dense_matrix = paulisum_to_dense(
+    hamiltonian,  # PauliSum
+    num_qubits=3,
+    device=None,  # Optional, defaults to default_device()
+    dtype=torch.complex128,  # Complex dtype
+)
+
+# Compute full eigensystem
+eigenvalues, eigenvectors = exact_eigensystem(
+    hamiltonian,
+    num_qubits=3,
+    k=None,  # Reserved for future use (subset of eigenpairs)
+    device=None,
+    dtype=torch.complex128,
+)
+# eigenvalues: shape (2**n_qubits,)
+# eigenvectors: shape (2**n_qubits, 2**n_qubits), columns are eigenvectors
+
+# Get just the ground state
+ground_energy, ground_state = exact_ground_state(
+    hamiltonian,
+    num_qubits=3,
+    device=None,
+    dtype=torch.complex128,
+)
+# ground_energy: scalar tensor
+# ground_state: shape (2**n_qubits,)
+```
+
+### Pre-built Models
+
+```python
+from qconduit.models import (
+    transverse_field_ising_chain,
+    heisenberg_xxz_chain,
+    ising_zz_chain,
+    two_qubit_generic_chemistry_like,
+    diagonal_z_field,
+)
+
+# Transverse field Ising model (TFIM)
+# H = -J * sum_{<i,j>} Z_i Z_j - h * sum_i X_i
+tfim = transverse_field_ising_chain(
+    num_sites=4,      # Number of spins
+    j_coupling=1.0,   # ZZ coupling strength
+    h_field=0.5,      # Transverse field strength
+    periodic=True,    # Periodic boundary conditions
+)
+
+# Heisenberg XXZ chain
+# H = J * sum_{<i,j>} (X_i X_j + Y_i Y_j + Δ Z_i Z_j)
+heisenberg = heisenberg_xxz_chain(
+    num_sites=3,
+    j_coupling=1.0,   # Overall coupling
+    delta=0.5,        # Anisotropy parameter
+    periodic=False,   # Open chain
+)
+
+# Ising ZZ chain (no transverse field)
+# H = -J * sum_{<i,j>} Z_i Z_j
+ising = ising_zz_chain(
+    num_sites=4,
+    j_coupling=1.0,
+    periodic=True,
+)
+
+# Two-qubit chemistry-like model
+# Generic two-qubit Hamiltonian for chemistry applications
+chemistry_ham = two_qubit_generic_chemistry_like(
+    h1_coeffs=[0.5, 0.3],  # One-body coefficients
+    h2_coeff=0.1,          # Two-body interaction coefficient
+)
+
+# Diagonal Z field
+# H = -field_strength * sum_i Z_i
+z_field = diagonal_z_field(
+    n_qubits=3,
+    field_strength=0.5,
+)
+```
+
+### Adiabatic Evolution
+
+```python
+from qconduit.adiabatic import (
+    ScheduleFn,
+    linear_schedule,
+    polynomial_schedule,
+    sample_schedule,
+    AdiabaticConfig,
+    interpolate_paulisum,
+    adiabatic_evolve_state,
+    build_adiabatic_circuit,
+    build_x_mixer_hamiltonian,
+    adiabatic_x_mixer_to_problem_state,
+)
+
+# Create schedules
+schedule_linear = linear_schedule(num_steps=20)  # Linear s(t) = t/T
+schedule_poly = polynomial_schedule(num_steps=20, power=2)  # Polynomial s(t) = (t/T)^p
+
+# Custom schedule function
+def custom_schedule(num_steps: int) -> torch.Tensor:
+    # Return 1D tensor of shape (num_steps,) with values in [0, 1]
+    return torch.linspace(0, 1, num_steps) ** 0.5
+
+# Build X mixer Hamiltonian: H_mixer = -sum_i X_i
+h_mixer = build_x_mixer_hamiltonian(n_qubits=3)
+
+# Interpolate between two Hamiltonians
+h_interpolated = interpolate_paulisum(
+    h_initial,  # Initial Hamiltonian
+    h_final,    # Final Hamiltonian
+    s=0.5,      # Interpolation parameter in [0, 1]
+)
+
+# Configure adiabatic evolution
+config = AdiabaticConfig(
+    total_time=1.0,              # Total evolution time
+    num_steps=20,                # Number of discrete steps
+    schedule=linear_schedule(20), # Schedule function
+    trotter_steps_per_interval=5, # Trotter steps per interval
+)
+
+# Evolve state adiabatically
+final_state = adiabatic_evolve_state(
+    initial_state,  # Initial statevector
+    h_mixer,        # Initial (mixer) Hamiltonian
+    h_problem,      # Final (problem) Hamiltonian
+    config,         # AdiabaticConfig
+    n_qubits=3,     # Number of qubits
+)
+
+# Build adiabatic circuit
+circuit = build_adiabatic_circuit(
+    h_mixer,
+    h_problem,
+    config,
+    n_qubits=3,
+)
+
+# Prepare ground state of X mixer (|+⟩^⊗n)
+ground_state = adiabatic_x_mixer_to_problem_state(
+    h_problem,
+    config,
+    n_qubits=3,
+)
+```
+
+### Fermion-to-Qubit Mappings
+
+```python
+from qconduit.fermion import (
+    FermionOpSymbol,
+    FermionTerm,
+    FermionOperator,
+    jordan_wigner,
+    bravyi_kitaev,
+)
+
+# Create fermionic operators
+# FermionOpSymbol: (mode_index, op_type) where op_type is "+" (creation) or "-" (annihilation)
+term1 = FermionTerm(
+    coeff=1.0,
+    operators=((0, "+"), (1, "-"))  # a^†_0 a_1
+)
+
+term2 = FermionTerm(
+    coeff=0.5,
+    operators=((1, "+"), (0, "-"), (2, "+"), (2, "-"))  # 0.5 * a^†_1 a_0 a^†_2 a_2
+)
+
+# Build FermionOperator (sum of terms)
+fermion_op = FermionOperator([term1, term2])
+
+# Map to qubits using Jordan-Wigner transform
+jw_hamiltonian = jordan_wigner(
+    fermion_op,
+    n_modes=3,  # Number of fermionic modes (spin-orbitals)
+)
+
+# Map to qubits using Bravyi-Kitaev transform
+bk_hamiltonian = bravyi_kitaev(
+    fermion_op,
+    n_modes=3,
+)
+
+# Both return PauliSum that can be used with VQE, exact diagonalization, etc.
+```
+
+### Enhanced Noise Models
+
+```python
+from qconduit.noise import (
+    NoiseConfig,
+    simulate_noisy_circuit_dm,
+    sample_noisy_circuit_dm,
+    DepolarizingChannel,
+    AmplitudeDampingChannel,
+    PhaseDampingChannel,
+)
+from qconduit.circuit import QuantumCircuit
+
+# Configure per-qubit noise channels
+noise_config = NoiseConfig(
+    per_qubit_channels={
+        0: DepolarizingChannel(prob=0.01),      # 1% depolarizing on qubit 0
+        1: AmplitudeDampingChannel(gamma=0.05), # Amplitude damping on qubit 1
+        2: PhaseDampingChannel(gamma=0.02),     # Phase damping on qubit 2
+    }
+)
+
+# Simulate noisy circuit (returns density matrix)
+circuit = QuantumCircuit(n_qubits=3)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+
+rho = simulate_noisy_circuit_dm(
+    circuit,
+    noise=noise_config,
+)
+# Returns density matrix of shape (2**n_qubits, 2**n_qubits)
+
+# Sample bitstrings from noisy circuit
+samples = sample_noisy_circuit_dm(
+    circuit,
+    noise=noise_config,
+    n_samples=1000,  # Number of samples
+)
+# Returns tensor of shape (n_samples, n_qubits) with bitstrings
+```
+
 ### Noise Models
 
 ```python
@@ -674,6 +1504,348 @@ from qconduit.diagnostics import bloch_vector
 state = create_single_qubit_state()
 bloch = bloch_vector(state)  # (x, y, z) coordinates
 # Use for plotting or analysis
+```
+
+### QAOA for Optimization Problems
+
+**MaxCut optimization:**
+```python
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian, Edge, VQE
+
+# Define your graph
+edges = [Edge(0, 1), Edge(1, 2), Edge(2, 3), Edge(3, 0)]  # 4-cycle
+hamiltonian = ising_maxcut_hamiltonian(num_nodes=4, edges=edges)
+
+# Use QAOA to find maximum cut
+qaoa = QAOAAnsatz(n_qubits=4, problem_hamiltonian=hamiltonian, p=3)
+vqe = VQE(ansatz=qaoa, hamiltonian=hamiltonian)
+# Optimize to find maximum cut value
+```
+
+**Weighted graphs:**
+```python
+# Use weighted edges for optimization problems
+weighted_edges = [
+    Edge(0, 1, weight=2.0),
+    Edge(1, 2, weight=1.5),
+    Edge(2, 0, weight=1.0),
+]
+hamiltonian = ising_maxcut_hamiltonian(num_nodes=3, edges=weighted_edges)
+```
+
+### Training Workflows
+
+**Complete training pipeline:**
+```python
+from qconduit.training import VQETrainer, TrainingCallback, EarlyStoppingConfig
+
+# Set up training with callbacks
+class CheckpointCallback(TrainingCallback):
+    def __call__(self, info):
+        if info.step % 50 == 0:
+            # Save checkpoint
+            torch.save(params, f"checkpoint_step_{info.step}.pt")
+
+trainer = VQETrainer(vqe, optimizer=optimizer)
+history = trainer.train(
+    params,
+    max_steps=500,
+    callbacks=[CheckpointCallback()],
+    early_stopping=EarlyStoppingConfig(patience=20),
+)
+
+# Analyze training
+print(f"Converged in {history.num_steps()} steps")
+print(f"Best energy: {history.best_energy()}")
+```
+
+### Sampling for Measurement Simulation
+
+**Simulate quantum measurements:**
+```python
+from qconduit.sampling import sample_bitstrings_state, bitstring_counts
+
+# Simulate 1000 measurements
+samples = sample_bitstrings_state(state, n_qubits=4, n_samples=1000)
+
+# Analyze measurement statistics
+counts = bitstring_counts(samples)
+most_common = max(counts.items(), key=lambda x: x[1])
+print(f"Most frequent outcome: {most_common[0]} ({most_common[1]} times)")
+
+# Compare with theoretical probabilities
+probs = qc.measure_probs(state, n_qubits=4)
+# Use KL divergence to measure agreement
+```
+
+**Partial measurements:**
+```python
+# Sample only specific qubits
+samples = sample_bitstrings_state(
+    state, n_qubits=4, n_samples=1000, qubits=[0, 1]  # Only measure qubits 0,1
+)
+```
+
+### Time Evolution for Quantum Dynamics
+
+**Simulate quantum dynamics:**
+```python
+from qconduit.time_evolution import time_evolve_state
+
+# Evolve state under a Hamiltonian
+times = torch.linspace(0, 1.0, 100)
+states = []
+for t_val in times:
+    evolved = time_evolve_state(state, hamiltonian, t=t_val.item(), n_steps=20, n_qubits=2)
+    states.append(evolved)
+
+# Analyze time-dependent properties
+expectations = [qc.measure_expectation_z(s, qubit=0, n_qubits=2) for s in states]
+```
+
+**Trotter circuit for hardware:**
+```python
+# Build circuit representation for hardware execution
+circuit = build_trotter_circuit(
+    hamiltonian, t=1.0, n_steps=50, n_qubits=2, order=2  # Second-order Trotter
+)
+print(circuit.to_text_diagram())  # Visualize the circuit
+```
+
+### Parameter Sweeps for Algorithm Exploration
+
+**Explore parameter landscapes:**
+```python
+from qconduit.experiments import sweep_vqe_1d, sweep_vqe_2d
+
+# 1D sweep: explore single parameter
+result = sweep_vqe_1d(
+    vqe,
+    points=torch.linspace(0, 2 * torch.pi, 100),
+    base_params=params_template,
+    index=0,
+)
+
+# Find optimal parameter value
+optimal_idx = result.values.argmin()
+optimal_param = result.points[optimal_idx]
+print(f"Optimal parameter: {optimal_param}")
+
+# 2D sweep: explore parameter interactions
+result_2d = sweep_vqe_2d(
+    vqe,
+    x_points=torch.linspace(0, 2 * torch.pi, 50),
+    y_points=torch.linspace(0, 2 * torch.pi, 50),
+    base_params=params_template,
+    x_index=0,
+    y_index=1,
+)
+# Visualize with matplotlib: plt.contourf(result_2d.values)
+```
+
+### Exact Solvers for Benchmarking
+
+**Validate VQE results:**
+```python
+from qconduit.exact import exact_ground_state
+from qconduit.algorithms import VQE
+
+# Get exact ground state energy
+exact_energy, exact_state = exact_ground_state(hamiltonian, num_qubits=4)
+
+# Compare with VQE result
+vqe = VQE(ansatz=ansatz, hamiltonian=hamiltonian)
+vqe_energy = vqe.energy(optimized_params)
+
+error = abs(vqe_energy - exact_energy)
+print(f"VQE error: {error.item():.6f}")
+print(f"Relative error: {(error / abs(exact_energy)).item():.2%}")
+```
+
+**Analyze full spectrum:**
+```python
+from qconduit.exact import exact_eigensystem
+
+# Get all eigenvalues and eigenvectors
+eigenvalues, eigenvectors = exact_eigensystem(hamiltonian, num_qubits=3)
+
+# Analyze energy gap
+gap = eigenvalues[1] - eigenvalues[0]
+print(f"Ground state energy: {eigenvalues[0].item():.6f}")
+print(f"First excited state: {eigenvalues[1].item():.6f}")
+print(f"Energy gap: {gap.item():.6f}")
+```
+
+### Pre-built Models for Research
+
+**Study phase transitions:**
+```python
+from qconduit.models import transverse_field_ising_chain
+from qconduit.exact import exact_ground_state
+
+# Study critical point in TFIM
+h_values = torch.linspace(0.1, 2.0, 20)
+energies = []
+for h in h_values:
+    hamiltonian = transverse_field_ising_chain(
+        num_sites=8, j_coupling=1.0, h_field=h.item(), periodic=True
+    )
+    energy, _ = exact_ground_state(hamiltonian, num_qubits=8)
+    energies.append(energy.item())
+
+# Plot energy vs field strength to identify phase transition
+```
+
+**Compare different models:**
+```python
+from qconduit.models import (
+    transverse_field_ising_chain,
+    heisenberg_xxz_chain,
+    ising_zz_chain,
+)
+
+# Compare ground state energies
+tfim = transverse_field_ising_chain(4, j_coupling=1.0, h_field=0.5)
+heisenberg = heisenberg_xxz_chain(4, j_coupling=1.0, delta=0.5)
+ising = ising_zz_chain(4, j_coupling=1.0)
+
+# Use exact diagonalization or VQE to compare
+```
+
+### Adiabatic Quantum Computing
+
+**Adiabatic optimization:**
+```python
+from qconduit.adiabatic import (
+    AdiabaticConfig, linear_schedule, adiabatic_evolve_state,
+    build_x_mixer_hamiltonian
+)
+
+# Set up adiabatic evolution for optimization
+h_mixer = build_x_mixer_hamiltonian(n_qubits=4)
+h_problem = your_problem_hamiltonian
+
+config = AdiabaticConfig(
+    total_time=2.0,
+    num_steps=50,
+    schedule=linear_schedule(50),
+    trotter_steps_per_interval=10
+)
+
+# Prepare initial state (ground state of mixer = |+⟩^⊗n)
+initial_state = prepare_plus_state(n_qubits=4)
+
+# Evolve adiabatically
+final_state = adiabatic_evolve_state(
+    initial_state, h_mixer, h_problem, config, n_qubits=4
+)
+
+# Measure to get solution
+probs = qc.measure_probs(final_state, n_qubits=4)
+solution = torch.argmax(probs)
+```
+
+**Custom schedules:**
+```python
+# Use polynomial schedule for slower initial evolution
+schedule = polynomial_schedule(num_steps=50, power=3.0)
+
+# Or create custom schedule
+def custom_schedule(num_steps):
+    # Spend more time near s=1 (problem Hamiltonian)
+    t = torch.linspace(0, 1, num_steps)
+    return t ** 0.3  # Slow start, fast finish
+```
+
+### Quantum Chemistry Applications
+
+**Map fermionic Hamiltonians:**
+```python
+from qconduit.fermion import FermionOperator, FermionTerm, jordan_wigner
+
+# Create molecular Hamiltonian (simplified example)
+# H = sum_{p,q} h_{pq} a^†_p a_q + sum_{p,q,r,s} g_{pqrs} a^†_p a^†_q a_r a_s
+terms = []
+# One-body terms
+for p in range(n_orbitals):
+    for q in range(n_orbitals):
+        if h_matrix[p, q] != 0:
+            terms.append(FermionTerm(
+                coeff=h_matrix[p, q],
+                operators=((p, "+"), (q, "-"))
+            ))
+# Two-body terms (simplified)
+# ... add interaction terms ...
+
+fermion_ham = FermionOperator(terms)
+
+# Map to qubits
+qubit_hamiltonian = jordan_wigner(fermion_ham, n_modes=n_orbitals)
+
+# Use with VQE or exact diagonalization
+from qconduit.algorithms import VQE
+vqe = VQE(ansatz=chemistry_ansatz, hamiltonian=qubit_hamiltonian)
+```
+
+**Compare mapping methods:**
+```python
+from qconduit.fermion import jordan_wigner, bravyi_kitaev
+
+# Jordan-Wigner typically has more Pauli terms but simpler structure
+jw_ham = jordan_wigner(fermion_op, n_modes=4)
+print(f"JW: {len(jw_ham.terms)} terms")
+
+# Bravyi-Kitaev often has fewer terms but more complex structure
+bk_ham = bravyi_kitaev(fermion_op, n_modes=4)
+print(f"BK: {len(bk_ham.terms)} terms")
+
+# Choose based on your hardware constraints
+```
+
+### Noisy Circuit Simulation
+
+**Model realistic hardware:**
+```python
+from qconduit.noise import NoiseConfig, simulate_noisy_circuit_dm
+from qconduit.noise import DepolarizingChannel, AmplitudeDampingChannel
+
+# Model realistic noise from quantum hardware
+noise_config = NoiseConfig(
+    per_qubit_channels={
+        0: DepolarizingChannel(prob=0.005),  # 0.5% gate error
+        1: DepolarizingChannel(prob=0.008),  # 0.8% gate error
+        2: AmplitudeDampingChannel(gamma=0.01),  # T1 decay
+    }
+)
+
+# Simulate circuit with noise
+rho = simulate_noisy_circuit_dm(circuit, noise=noise_config)
+
+# Compare with ideal simulation
+ideal_state = circuit.simulate_state()
+ideal_rho = qc.dm_from_statevector(ideal_state)
+
+# Compute fidelity
+from qconduit.diagnostics import fidelity
+f = fidelity(ideal_rho, rho)
+print(f"Fidelity: {f.item():.6f}")
+```
+
+**Error mitigation studies:**
+```python
+# Study how noise affects algorithm performance
+noise_levels = [0.001, 0.005, 0.01, 0.02]
+fidelities = []
+
+for prob in noise_levels:
+    noise = NoiseConfig(per_qubit_channels={
+        i: DepolarizingChannel(prob=prob) for i in range(n_qubits)
+    })
+    rho = simulate_noisy_circuit_dm(circuit, noise=noise)
+    f = fidelity(ideal_rho, rho)
+    fidelities.append(f.item())
+
+# Analyze noise threshold
 ```
 
 ## Performance Considerations
