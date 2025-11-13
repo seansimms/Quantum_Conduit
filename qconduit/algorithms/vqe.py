@@ -11,6 +11,7 @@ from ..core.device import Device
 from ..layers.ansatzes import ParametricAnsatz
 from ..operators.pauli import PauliSum
 from ..operators.expectation import expectation_pauli_sum
+from ..grad import param_shift_energy
 
 if TYPE_CHECKING:
     pass
@@ -79,12 +80,15 @@ class VQE(nn.Module):
             containing eigenvalues (must be real-valued), or a PauliSum object
             representing a Pauli-sum Hamiltonian.
         device: Device specification. If None, uses the ansatz's device.
+        use_param_shift: If True, use parameter-shift gradients instead of direct
+            autograd. Defaults to False.
 
     Attributes:
         ansatz: ParametricAnsatz instance.
         hamiltonian_diag: Diagonal Hamiltonian tensor, or None if using PauliSum.
         hamiltonian_pauli: PauliSum Hamiltonian, or None if using diagonal.
         device: Quantum device instance.
+        use_param_shift: Whether to use parameter-shift gradients.
 
     Example:
         >>> from qconduit.layers.ansatzes import HardwareEfficientAnsatz
@@ -105,6 +109,7 @@ class VQE(nn.Module):
         ansatz: ParametricAnsatz,
         hamiltonian: torch.Tensor | PauliSum,
         device: Device | None = None,
+        use_param_shift: bool = False,
     ) -> None:
         """Initialize a VQE instance."""
         super().__init__()
@@ -113,6 +118,7 @@ class VQE(nn.Module):
             raise ValueError(f"ansatz.n_qubits must be >= 1, got {ansatz.n_qubits}")
 
         self.ansatz = ansatz
+        self.use_param_shift = use_param_shift
 
         # Determine device
         if device is None:
@@ -170,6 +176,10 @@ class VQE(nn.Module):
         For a Pauli-sum Hamiltonian, this uses standard Pauli expectation evaluation
         via basis rotations and Z measurements.
 
+        If use_param_shift=True, the energy is computed using the parameter-shift
+        gradient engine, which provides gradients via repeated energy evaluations
+        and does not rely on backend differentiability.
+
         Args:
             params: Parameter tensor for the ansatz. Shape can be (num_parameters,)
                 for unbatched or (batch_size, num_parameters) for batched inputs.
@@ -182,6 +192,27 @@ class VQE(nn.Module):
             RuntimeError: If neither hamiltonian_diag nor hamiltonian_pauli is set
                 (should not occur if constructor is used correctly).
         """
+        # Use parameter-shift path if requested
+        if self.use_param_shift:
+            # Choose the right Hamiltonian representation to pass
+            if self.hamiltonian_diag is not None:
+                hamiltonian: torch.Tensor | PauliSum = self.hamiltonian_diag
+            elif self.hamiltonian_pauli is not None:
+                hamiltonian = self.hamiltonian_pauli
+            else:
+                raise RuntimeError(
+                    "Neither hamiltonian_diag nor hamiltonian_pauli is set. "
+                    "This should not occur if VQE is constructed correctly."
+                )
+
+            return param_shift_energy(
+                ansatz=self.ansatz,
+                hamiltonian=hamiltonian,
+                params=params,
+                device=self.device,
+            )
+
+        # Existing direct-autograd path (unchanged)
         # Build quantum state using the ansatz
         state = self.ansatz(params)  # shape: (2**n_qubits,) or (batch_size, 2**n_qubits)
 

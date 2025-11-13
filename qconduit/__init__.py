@@ -38,6 +38,9 @@ from .operators import (
     expectation_pauli_sum,
 )
 
+# Gradients
+from .grad import param_shift_energy
+
 __all__ = [
     # Version
     "__version__",
@@ -70,4 +73,6 @@ __all__ = [
     "PauliSum",
     "expectation_pauli_term",
     "expectation_pauli_sum",
+    # Gradients
+    "param_shift_energy",
 ]
