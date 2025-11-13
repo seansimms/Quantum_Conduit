@@ -352,3 +352,112 @@ class TestVQEPauliSum:
         energy = vqe.energy(params)
         assert torch.allclose(energy, torch.tensor(0.5), atol=1e-5)
 
+
+class TestVQENoise:
+    """Tests for VQE with noise models."""
+
+    def test_vqe_with_noise_initialization(self):
+        """Test VQE can be initialized with noise_model."""
+        from qconduit.noise import AmplitudeDampingChannel
+
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        noise = AmplitudeDampingChannel(gamma=0.5)
+        vqe = VQE(ansatz, hamiltonian, noise_model=noise)
+        assert vqe.noise_model == noise
+
+    def test_vqe_direct_with_noise(self):
+        """Test direct VQE energy computation with noise."""
+        from qconduit.noise import AmplitudeDampingChannel
+
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        H = PauliSum.from_terms([term])
+
+        # Without noise
+        vqe_clean = VQE(ansatz, H, use_param_shift=False, noise_model=None)
+        params = torch.tensor([0.3], dtype=torch.float32)
+        energy_clean = vqe_clean.energy(params).item()
+
+        # With amplitude damping noise
+        noise = AmplitudeDampingChannel(gamma=0.5)
+        vqe_noisy = VQE(ansatz, H, use_param_shift=False, noise_model=noise)
+        energy_noisy = vqe_noisy.energy(params).item()
+
+        # Energy should differ (noise has an effect)
+        assert abs(energy_noisy - energy_clean) > 1e-6
+        # Both should be finite
+        assert torch.isfinite(torch.tensor(energy_clean))
+        assert torch.isfinite(torch.tensor(energy_noisy))
+
+    def test_vqe_param_shift_with_noise(self):
+        """Test parameter-shift VQE with noise."""
+        from qconduit.noise import DepolarizingChannel
+
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        H = PauliSum.from_terms([term])
+
+        noise = DepolarizingChannel(p=0.2)
+        vqe_ps = VQE(ansatz, H, use_param_shift=True, noise_model=noise)
+        params = torch.nn.Parameter(torch.tensor([0.1], dtype=torch.float32))
+
+        optimizer = torch.optim.SGD([params], lr=0.1)
+        initial_energy = vqe_ps.energy(params.detach()).item()
+
+        # Run a few optimization steps
+        for _ in range(10):
+            optimizer.zero_grad()
+            energy = vqe_ps.energy(params)
+            energy.backward()
+            optimizer.step()
+
+        final_energy = vqe_ps.energy(params.detach()).item()
+
+        # Check gradients were computed
+        assert params.grad is not None
+        # Both energies should be finite
+        assert torch.isfinite(torch.tensor(initial_energy))
+        assert torch.isfinite(torch.tensor(final_energy))
+        # Energy should not increase dramatically (param-shift path is stable)
+        assert final_energy <= initial_energy + 1e-3
+
+    def test_vqe_noise_consistency_pure_vs_dm(self):
+        """Test that pure-state and density-matrix paths are consistent when noise=None."""
+        from qconduit.backend.density_matrix import dm_from_statevector
+        from qconduit.operators.expectation import expectation_pauli_sum_dm
+
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        H = PauliSum.from_terms([term])
+
+        # Pure-state path
+        vqe_clean = VQE(ansatz, H, noise_model=None)
+        params = torch.tensor([0.3], dtype=torch.float32)
+        energy_pure = vqe_clean.energy(params).item()
+
+        # Density-matrix path (manually compute)
+        state = ansatz(params)
+        rho = dm_from_statevector(state)
+        energy_dm = expectation_pauli_sum_dm(rho, H).item()
+
+        # Should match (within numerical tolerance)
+        assert abs(energy_pure - energy_dm) < 1e-5
+
+    def test_vqe_noise_diagonal_hamiltonian(self):
+        """Test VQE with noise and diagonal Hamiltonian."""
+        from qconduit.noise import PhaseDampingChannel
+
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        hamiltonian = torch.tensor([0.0, 1.0])
+        noise = PhaseDampingChannel(gamma=0.3)
+
+        vqe = VQE(ansatz, hamiltonian, noise_model=noise)
+        params = torch.tensor([0.2], dtype=torch.float32)
+        energy = vqe.energy(params).item()
+
+        # Energy should be finite
+        assert torch.isfinite(torch.tensor(energy))
+        # With phase damping, energy should be between 0 and 1
+        assert 0.0 <= energy <= 1.0
+
