@@ -1,0 +1,47 @@
+{
+  "creators": [
+    {
+      "name": "Simms, Sean",
+      "affiliation": "Independent Researcher",
+      "orcid": ""
+    }
+  ],
+  "title": "Quantum Conduit: A PyTorch-native quantum statevector plumbing library for quantum machine learning",
+  "description": "Quantum Conduit is a minimal, PyTorch-native quantum statevector library designed specifically for quantum machine learning applications. Unlike high-level quantum frameworks, Quantum Conduit provides clean, low-level abstractions that integrate seamlessly with PyTorch's computational graph, enabling native autograd support and batch processing for quantum operations.\n\nKey features include:\n- Statevector and density matrix backends with full batch support\n- Complete standard gate library (I, X, Y, Z, H, S, T, CNOT, RX, RY, RZ)\n- Variational Quantum Eigensolver (VQE) and Quantum Approximate Optimization Algorithm (QAOA)\n- Parameter-shift gradient computation\n- Noise models and quantum channels\n- Adiabatic quantum computing\n- Fermion-to-qubit mappings (Jordan-Wigner, Bravyi-Kitaev)\n- Circuit transpilation and decomposition\n- Quantum state tomography\n- Full PyTorch autograd support",
+  "keywords": [
+    "quantum computing",
+    "quantum machine learning",
+    "pytorch",
+    "variational quantum algorithms",
+    "VQE",
+    "QAOA",
+    "quantum statevector",
+    "quantum simulation",
+    "quantum chemistry",
+    "quantum optimization"
+  ],
+  "license": {
+    "id": "MIT"
+  },
+  "version": "0.0.1",
+  "upload_type": "software",
+  "access_right": "open",
+  "communities": [
+    {
+      "identifier": "zenodo"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/seansimms/Quantum_Conduit"
+    },
+    {
+      "relation": "isDocumentedBy",
+      "identifier": "https://github.com/seansimms/Quantum_Conduit"
+    }
+  ],
+  "contributors": [],
+  "references": []
+}
+

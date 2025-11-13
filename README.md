@@ -7,7 +7,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.1+](https://img.shields.io/badge/PyTorch-2.1+-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.0.1-blue.svg)](https://github.com/yourusername/Quantum_Conduit)
+[![Version](https://img.shields.io/badge/version-0.0.1-blue.svg)](https://github.com/seansimms/Quantum_Conduit)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17599984.svg)](https://doi.org/10.5281/zenodo.17599984)
 
 [Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Documentation](#api-reference) • [Examples](#examples)
 
@@ -51,6 +52,7 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 - **🔍 VQE Algorithm**: Built-in Variational Quantum Eigensolver for ground-state energy estimation
 - **🎯 QAOA Algorithm**: Quantum Approximate Optimization Algorithm for MaxCut/Ising problems
 - **🌡️ Adiabatic Evolution**: Adiabatic quantum computing with configurable schedules and circuit building
+- **🎛️ Variational Scaffolding**: High-level APIs for running VQE and QAOA with result objects
 - **🤖 Hybrid Quantum-Classical**: Seamless integration with PyTorch neural networks
 - **📈 Parameter-Shift Gradients**: Quantum-aware gradient computation via parameter-shift rule
 - **🔄 Full Autograd Support**: Native PyTorch differentiation throughout the stack
@@ -59,17 +61,19 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 ### Advanced Features
 
 - **🎯 Pauli Operators**: Complete support for Pauli-term and Pauli-sum Hamiltonians
-- **🌪️ Noise Models**: Standard quantum channels and circuit-level noise simulation with NoiseConfig
+- **🌪️ Noise Models**: Standard quantum channels, enhanced Kraus channels, and circuit-level noise simulation
 - **📦 Batch Processing**: Efficient batch operations for training quantum models
 - **🎨 Extensible Design**: Clean abstractions for custom gates, ansätze, and algorithms
 - **🐛 Debug Mode**: Built-in debugging with normalization checks and validation
 - **🎲 Sampling Utilities**: Bitstring sampling and probability distribution analysis
-- **⏱️ Time Evolution**: Trotterization and Hamiltonian time evolution
+- **⏱️ Time Evolution**: Trotterization and exact Hamiltonian time evolution (dual APIs)
 - **⚙️ Optimizer Factory**: Convenient optimizer creation utilities
 - **🔬 Experimental Tools**: Parameter sweep utilities for algorithm exploration
 - **🔬 Exact Solvers**: Exact diagonalization for benchmarking and validation (small systems)
 - **🏗️ Pre-built Models**: Standard quantum many-body models (spin chains, chemistry models)
 - **🧬 Fermion-to-Qubit Mappings**: Jordan-Wigner and Bravyi-Kitaev transforms for quantum chemistry
+- **🔬 Quantum State Tomography**: Density matrix reconstruction from Pauli measurements
+- **⚙️ Circuit Transpilation**: Gate decomposition and basis set conversion for hardware compatibility
 
 ## Installation
 
@@ -589,6 +593,244 @@ counts = bitstring_counts(samples)
 print(f"Sample distribution: {counts}")
 ```
 
+### Example 16: Quantum State Tomography
+
+```python
+from qconduit.measurement import (
+    single_qubit_pauli_expectations_from_statevector,
+    reconstruct_single_qubit_density_from_pauli,
+    two_qubit_pauli_expectations_from_statevector,
+    reconstruct_two_qubit_density_from_pauli,
+    pauli_expectation_from_statevector,
+)
+import qconduit as qc
+
+# Create a quantum state
+state = qc.zero_state(n_qubits=1)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=1)
+state = qc.apply_gate(state, qc.RY(0.5), qubit=0, n_qubits=1)
+
+# Measure Pauli expectations
+ex_x, ex_y, ex_z = single_qubit_pauli_expectations_from_statevector(state)
+print(f"Pauli expectations: X={ex_x:.4f}, Y={ex_y:.4f}, Z={ex_z:.4f}")
+
+# Reconstruct density matrix from measurements
+rho_reconstructed = reconstruct_single_qubit_density_from_pauli(ex_x, ex_y, ex_z)
+
+# Compare with actual density matrix
+rho_actual = qc.dm_from_statevector(state)
+fidelity = qc.fidelity(rho_actual, rho_reconstructed)
+print(f"Reconstruction fidelity: {fidelity.item():.6f}")
+
+# Two-qubit tomography
+state_2q = qc.zero_state(n_qubits=2)
+state_2q = qc.apply_gate(state_2q, qc.H(), qubit=0, n_qubits=2)
+state_2q = qc.apply_two_qubit_gate(state_2q, qc.CNOT(), qubit1=0, qubit2=1, n_qubits=2)
+
+# Get all two-qubit Pauli expectations
+pauli_expectations = two_qubit_pauli_expectations_from_statevector(state_2q)
+rho_2q = reconstruct_two_qubit_density_from_pauli(pauli_expectations)
+```
+
+### Example 17: Variational Algorithm Scaffolding
+
+```python
+from qconduit.variational import (
+    VariationalAnsatz,
+    HardwareEfficientAnsatz,
+    LayeredEntanglerAnsatz,
+    run_vqe,
+    run_qaoa,
+    VQEResult,
+    QAOAResult,
+)
+from qconduit.operators import PauliSum, PauliTerm
+import torch
+
+# Create a Hamiltonian
+hamiltonian = PauliSum.from_terms([
+    PauliTerm(1.0, ("Z", "Z")),
+    PauliTerm(0.5, ("X", "I")),
+    PauliTerm(0.5, ("I", "X")),
+])
+
+# High-level VQE API
+from qconduit.variational import HardwareEfficientAnsatz
+import torch
+
+ansatz = HardwareEfficientAnsatz(num_qubits=2, num_layers=2)
+initial_params = torch.randn(ansatz.num_parameters)
+
+result = run_vqe(
+    hamiltonian=hamiltonian,
+    ansatz=ansatz,
+    initial_params=initial_params,
+    max_iterations=100,
+    learning_rate=0.1,
+)
+
+print(f"Ground state energy: {result.optimal_value:.6f}")
+print(f"Optimal parameters: {result.optimal_params}")
+print(f"Converged: {result.converged}")
+
+# High-level QAOA API
+qaoa_result = run_qaoa(
+    cost_hamiltonian=hamiltonian,
+    num_qubits=2,
+    depth=2,
+    max_iterations=100,
+    learning_rate=0.05,
+)
+
+print(f"QAOA optimal energy: {qaoa_result.optimal_value:.6f}")
+```
+
+### Example 18: Circuit Transpilation
+
+```python
+from qconduit.transpile import (
+    decompose_h_to_rz_rx_rz,
+    transpile_to_rx_rz_cx_basis,
+    transpile_to_clifford_t,
+    summarize_gate_counts,
+    estimate_circuit_depth,
+    GateCountSummary,
+)
+from qconduit.circuit import QuantumCircuit
+import qconduit as qc
+
+# Create a circuit with various gates
+circuit = QuantumCircuit(n_qubits=3)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+circuit.add_gate("T", [1])
+circuit.add_gate("S", [2])
+circuit.add_gate("RX", [0], params=[0.5])
+
+# Transpile to RX, RZ, CNOT basis (common hardware basis)
+transpiled = transpile_to_rx_rz_cx_basis(circuit)
+print("Transpiled circuit:")
+print(transpiled.to_text_diagram())
+
+# Transpile to Clifford+T basis
+clifford_t = transpile_to_clifford_t(circuit)
+print("\nClifford+T circuit:")
+print(clifford_t.to_text_diagram())
+
+# Analyze gate counts
+summary = summarize_gate_counts(clifford_t)
+print(f"\nGate counts: {summary.counts}")
+print(f"T-count: {summary.t_count}")
+print(f"Clifford count: {summary.clifford_count}")
+
+# Estimate circuit depth
+depth = estimate_circuit_depth(transpiled)
+print(f"Circuit depth: {depth}")
+```
+
+### Example 19: Enhanced Kraus Channels
+
+```python
+from qconduit.noise import (
+    KrausChannel,
+    bit_flip_channel,
+    phase_flip_channel,
+    bit_phase_flip_channel,
+    generalized_amplitude_damping_channel,
+    two_qubit_depolarizing_channel,
+    compose_kraus_channels,
+    apply_kraus_channel_to_statevector,
+    apply_kraus_channel_to_density_matrix,
+)
+import qconduit as qc
+import torch
+
+# Create various noise channels
+bit_flip = bit_flip_channel(p=0.01)  # 1% bit flip probability
+phase_flip = phase_flip_channel(p=0.02)  # 2% phase flip probability
+bit_phase_flip = bit_phase_flip_channel(p=0.005)  # 0.5% bit-phase flip
+
+# Generalized amplitude damping (with temperature)
+amp_damp = generalized_amplitude_damping_channel(
+    gamma=0.1,  # Damping rate
+    n_th=0.1,   # Thermal population
+)
+
+# Two-qubit depolarizing channel
+two_qubit_depol = two_qubit_depolarizing_channel(p=0.01)
+
+# Compose channels (apply sequentially)
+combined = compose_kraus_channels(bit_flip, phase_flip)
+
+# Apply to statevector
+state = qc.zero_state(n_qubits=1)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=1)
+noisy_state = apply_kraus_channel_to_statevector(
+    state, bit_flip, qubit=0, n_qubits=1
+)
+
+# Apply to density matrix
+rho = qc.dm_from_statevector(state)
+noisy_rho = apply_kraus_channel_to_density_matrix(
+    rho, phase_flip, qubit=0, n_qubits=1
+)
+
+# Check channel properties
+print(f"Bit flip channel is trace-preserving: {bit_flip.is_trace_preserving()}")
+print(f"Kraus operators: {len(bit_flip.kraus_ops)}")
+```
+
+### Example 20: Exact Time Evolution
+
+```python
+from qconduit.evolution import (
+    exact_time_evolution_statevector,
+    TrotterOrder,
+    TrotterSchedule,
+    evolve_state_trotter,
+)
+from qconduit.operators import PauliSum, PauliTerm
+import qconduit as qc
+
+# Create a Hamiltonian
+hamiltonian = PauliSum.from_terms([
+    PauliTerm(1.0, ("Z", "Z")),
+    PauliTerm(0.5, ("X", "I")),
+    PauliTerm(0.5, ("I", "X")),
+])
+
+# Exact time evolution (for small systems)
+state = qc.zero_state(n_qubits=2)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=2)
+
+evolved_exact = exact_time_evolution_statevector(
+    state, hamiltonian, time=0.5
+)
+
+# Trotterized evolution (for larger systems)
+from qconduit.evolution import TrotterOrder, TrotterSchedule
+
+schedule = TrotterSchedule(
+    dt=0.05,  # Time step
+    n_steps=10,  # Number of steps
+    order=TrotterOrder.FIRST,  # or TrotterOrder.SECOND
+)
+
+evolved_trotter = evolve_state_trotter(
+    state,
+    hamiltonian,
+    schedule,
+    n_qubits=2,
+)
+
+# Compare results
+fidelity = qc.fidelity(
+    qc.dm_from_statevector(evolved_exact),
+    qc.dm_from_statevector(evolved_trotter)
+)
+print(f"Fidelity between exact and Trotter: {fidelity.item():.6f}")
+```
+
 ## Architecture
 
 ### Design Principles
@@ -618,12 +860,16 @@ qconduit/
 ├── training/       # Training loops and utilities
 ├── sampling/       # Bitstring sampling and analysis
 ├── time_evolution/ # Trotterization and time evolution
+├── evolution/      # Alternative evolution API (exact + enhanced Trotter)
 ├── optim/          # Optimizer factory utilities
 ├── experiments/    # Parameter sweep utilities
 ├── exact/          # Exact diagonalization for small systems
 ├── models/         # Pre-built quantum many-body models
 ├── adiabatic/      # Adiabatic quantum computing
-└── fermion/        # Fermion-to-qubit mappings
+├── fermion/        # Fermion-to-qubit mappings
+├── measurement/    # Measurement and quantum state tomography
+├── variational/    # Variational algorithm scaffolding
+└── transpile/      # Gate decomposition and circuit transpilation
 ```
 
 ### Key Components
@@ -638,12 +884,16 @@ qconduit/
 - **Training Infrastructure**: Complete training loops with callbacks and history tracking
 - **Sampling**: Bitstring sampling and probability distribution analysis
 - **Time Evolution**: Trotterization for Hamiltonian simulation
+- **Evolution**: Alternative evolution API with exact and enhanced Trotter methods
 - **Optimizers**: Factory utilities for optimizer creation
 - **Experiments**: Parameter sweep utilities for algorithm exploration
 - **Exact Solvers**: Exact diagonalization for benchmarking and validation
 - **Pre-built Models**: Standard quantum many-body models (spin chains, chemistry)
 - **Adiabatic Evolution**: Adiabatic quantum computing with configurable schedules
 - **Fermion-to-Qubit Mappings**: Jordan-Wigner and Bravyi-Kitaev transforms
+- **Measurement/Tomography**: Quantum state tomography and Pauli expectation measurements
+- **Variational Scaffolding**: High-level APIs for VQE and QAOA algorithms
+- **Transpilation**: Gate decomposition and basis set conversion for hardware
 
 ## Examples
 
@@ -1326,6 +1576,249 @@ bk_hamiltonian = bravyi_kitaev(
 # Both return PauliSum that can be used with VQE, exact diagonalization, etc.
 ```
 
+### Evolution Module (Alternative API)
+
+```python
+from qconduit.evolution import (
+    exact_time_evolution_statevector,
+    TrotterOrder,
+    TrotterSchedule,
+    evolve_state_trotter,
+    build_trotter_step_circuit,
+    build_trotter_circuit,
+)
+
+# Exact time evolution (for small systems, uses dense matrix exponentiation)
+evolved = exact_time_evolution_statevector(
+    state,        # Initial statevector
+    hamiltonian,  # PauliSum Hamiltonian
+    time=0.5,     # Evolution time
+    device=None,  # Optional device
+)
+
+# Enhanced Trotter evolution with schedule
+schedule = TrotterSchedule(
+    num_steps=10,     # Number of Trotter steps
+    total_time=0.5,   # Total evolution time
+    order=1,          # TrotterOrder.FIRST (1) or TrotterOrder.SECOND (2)
+)
+
+evolved_trotter = evolve_state_trotter(
+    state,
+    hamiltonian,
+    schedule,
+    n_qubits=2,
+)
+
+# Build Trotter circuits
+step_circuit = build_trotter_step_circuit(hamiltonian, schedule, n_qubits=2)
+full_circuit = build_trotter_circuit(hamiltonian, schedule, n_qubits=2)
+```
+
+### Measurement and Quantum State Tomography
+
+```python
+from qconduit.measurement import (
+    # Sampling utilities
+    basis_probabilities_from_statevector,
+    sample_bitstrings_from_probabilities,
+    sample_bitstrings_from_statevector,
+    bitstring_counts,
+    empirical_probabilities_from_bitstrings,
+    estimate_pauli_z_expectation_from_samples,
+    # Pauli expectation values
+    pauli_matrix_from_label,
+    pauli_expectation_from_statevector,
+    single_qubit_pauli_expectations_from_statevector,
+    two_qubit_pauli_expectations_from_statevector,
+    # State tomography
+    reconstruct_single_qubit_density_from_pauli,
+    reconstruct_two_qubit_density_from_pauli,
+)
+
+# Get basis probabilities
+probs = basis_probabilities_from_statevector(state, n_qubits=2)
+
+# Sample bitstrings
+samples = sample_bitstrings_from_statevector(state, n_qubits=2, n_samples=1000)
+
+# Compute Pauli expectation values
+ex_x = pauli_expectation_from_statevector(state, "X", n_qubits=1)
+ex_zz = pauli_expectation_from_statevector(state, "ZZ", n_qubits=2)
+
+# Single-qubit tomography
+ex_x, ex_y, ex_z = single_qubit_pauli_expectations_from_statevector(state)
+rho = reconstruct_single_qubit_density_from_pauli(ex_x, ex_y, ex_z)
+
+# Two-qubit tomography
+pauli_expectations = two_qubit_pauli_expectations_from_statevector(state_2q)
+rho_2q = reconstruct_two_qubit_density_from_pauli(pauli_expectations)
+
+# Estimate expectation from samples
+z_expectation = estimate_pauli_z_expectation_from_samples(samples, qubit=0, n_qubits=2)
+```
+
+### Variational Algorithm Scaffolding
+
+```python
+from qconduit.variational import (
+    VariationalAnsatz,
+    HardwareEfficientAnsatz,
+    LayeredEntanglerAnsatz,
+    QAOAAnsatz,
+    run_vqe,
+    run_qaoa,
+    VQEResult,
+    QAOAResult,
+    evaluate_expectation_value,
+)
+
+# High-level VQE API
+from qconduit.variational import HardwareEfficientAnsatz
+import torch
+
+ansatz = HardwareEfficientAnsatz(num_qubits=3, num_layers=2)
+initial_params = torch.randn(ansatz.num_parameters)
+
+result = run_vqe(
+    hamiltonian=hamiltonian,
+    ansatz=ansatz,
+    initial_params=initial_params,
+    optimizer_name="adam",  # or "sgd"
+    max_iterations=200,
+    learning_rate=0.1,
+    tol_rel=1e-6,  # Relative tolerance for convergence
+    device=None,
+)
+
+# Access results
+print(f"Optimal energy: {result.optimal_value}")
+print(f"Optimal parameters: {result.optimal_params}")
+print(f"Converged: {result.converged}")
+print(f"Number of iterations: {result.num_iterations}")
+
+# High-level QAOA API
+qaoa_result = run_qaoa(
+    cost_hamiltonian=hamiltonian,
+    num_qubits=3,
+    depth=2,
+    initial_params=None,
+    optimizer_name="adam",
+    max_iterations=200,
+    learning_rate=0.05,
+    tol_rel=1e-6,
+    device=None,
+)
+
+# Evaluate expectation value for custom ansatz
+ansatz = HardwareEfficientAnsatz(n_qubits=3, depth=2)
+params = torch.randn(ansatz.num_parameters)
+energy = evaluate_expectation_value(ansatz, hamiltonian, params)
+```
+
+### Circuit Transpilation
+
+```python
+from qconduit.transpile import (
+    # Gate decomposition
+    decompose_h_to_rz_rx_rz,
+    decompose_x_to_rx,
+    decompose_y_to_ry,
+    decompose_z_to_rz,
+    decompose_rz_to_clifford_t,
+    decompose_gate_to_basis,
+    # Basis transpilation
+    transpile_to_basis,
+    transpile_to_rx_rz_cx_basis,
+    transpile_to_clifford_t,
+    # Circuit analysis
+    GateCountSummary,
+    summarize_gate_counts,
+    estimate_circuit_depth,
+)
+
+# Decompose individual gates
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+decompose_h_to_rz_rx_rz(circuit, qubit=0)  # Modifies circuit in-place
+
+# Transpile to specific basis
+rx_rz_cx = transpile_to_rx_rz_cx_basis(circuit)  # Returns new circuit
+clifford_t = transpile_to_clifford_t(circuit)  # Returns new circuit
+
+# Transpile to custom basis
+custom_basis = transpile_to_basis(circuit, basis_gates=["RX", "RZ", "CNOT"])
+
+# Analyze circuits
+summary = summarize_gate_counts(circuit)
+print(f"Gate counts: {summary.counts}")
+print(f"T-count: {summary.t_count}")
+print(f"Clifford count: {summary.clifford_count}")
+print(f"Total gates: {summary.total_gates}")
+
+# Estimate depth
+depth = estimate_circuit_depth(circuit)
+print(f"Circuit depth: {depth}")
+```
+
+### Enhanced Kraus Channels
+
+```python
+from qconduit.noise import (
+    KrausChannel,
+    bit_flip_channel,
+    phase_flip_channel,
+    bit_phase_flip_channel,
+    generalized_amplitude_damping_channel,
+    two_qubit_depolarizing_channel,
+    to_density_matrix,
+    apply_kraus_channel_to_density_matrix,
+    apply_kraus_channel_to_statevector,
+    compose_kraus_channels,
+)
+
+# Create standard noise channels
+bit_flip = bit_flip_channel(p=0.01)  # p in [0, 1]
+phase_flip = phase_flip_channel(p=0.02)
+bit_phase_flip = bit_phase_flip_channel(p=0.005)
+
+# Generalized amplitude damping (with thermal population)
+amp_damp = generalized_amplitude_damping_channel(
+    gamma=0.1,  # Damping rate
+    n_th=0.1,   # Thermal population (0 = zero temperature)
+)
+
+# Two-qubit depolarizing channel
+two_qubit_depol = two_qubit_depolarizing_channel(p=0.01)
+
+# Create custom Kraus channel
+kraus_ops = (K0, K1, K2)  # Tuple of Kraus operators
+custom_channel = KrausChannel(
+    name="custom",
+    kraus_ops=kraus_ops,
+    num_qubits=1,
+)
+
+# Compose multiple channels
+combined = compose_kraus_channels([bit_flip, phase_flip])
+
+# Apply to statevector
+noisy_state = apply_kraus_channel_to_statevector(
+    state, channel, qubit=0, n_qubits=2
+)
+
+# Apply to density matrix
+noisy_rho = apply_kraus_channel_to_density_matrix(
+    rho, channel, qubit=0, n_qubits=2
+)
+
+# Convert statevector to density matrix
+rho = to_density_matrix(state)
+
+# Check channel properties
+is_tp = channel.is_trace_preserving()  # Check trace-preserving property
+```
+
 ### Enhanced Noise Models
 
 ```python
@@ -1610,6 +2103,209 @@ circuit = build_trotter_circuit(
     hamiltonian, t=1.0, n_steps=50, n_qubits=2, order=2  # Second-order Trotter
 )
 print(circuit.to_text_diagram())  # Visualize the circuit
+```
+
+### Quantum State Tomography
+
+**Reconstruct density matrices from measurements:**
+```python
+from qconduit.measurement import (
+    single_qubit_pauli_expectations_from_statevector,
+    reconstruct_single_qubit_density_from_pauli,
+    two_qubit_pauli_expectations_from_statevector,
+    reconstruct_two_qubit_density_from_pauli,
+)
+
+# Single-qubit tomography
+state = qc.zero_state(n_qubits=1)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=1)
+
+# Measure Pauli expectations
+ex_x, ex_y, ex_z = single_qubit_pauli_expectations_from_statevector(state)
+
+# Reconstruct density matrix
+rho_reconstructed = reconstruct_single_qubit_density_from_pauli(ex_x, ex_y, ex_z)
+
+# Verify reconstruction fidelity
+rho_actual = qc.dm_from_statevector(state)
+fidelity = qc.fidelity(rho_actual, rho_reconstructed)
+print(f"Reconstruction fidelity: {fidelity.item():.6f}")
+
+# Two-qubit tomography
+state_2q = qc.zero_state(n_qubits=2)
+state_2q = qc.apply_gate(state_2q, qc.H(), qubit=0, n_qubits=2)
+state_2q = qc.apply_two_qubit_gate(state_2q, qc.CNOT(), qubit1=0, qubit2=1, n_qubits=2)
+
+# Get all two-qubit Pauli expectations
+pauli_expectations = two_qubit_pauli_expectations_from_statevector(state_2q)
+rho_2q = reconstruct_two_qubit_density_from_pauli(pauli_expectations)
+```
+
+**Estimate expectations from samples:**
+```python
+from qconduit.measurement import estimate_pauli_z_expectation_from_samples
+
+# Sample bitstrings from state
+samples = sample_bitstrings_from_statevector(state, n_qubits=2, n_samples=10000)
+
+# Estimate Pauli-Z expectation from samples
+z_expectation = estimate_pauli_z_expectation_from_samples(samples, qubit=0, n_qubits=2)
+```
+
+### High-Level Variational Algorithms
+
+**Run VQE with minimal code:**
+```python
+from qconduit.variational import run_vqe
+
+# Simple VQE execution
+from qconduit.variational import HardwareEfficientAnsatz
+import torch
+
+ansatz = HardwareEfficientAnsatz(num_qubits=4, num_layers=3)
+initial_params = torch.randn(ansatz.num_parameters)
+
+result = run_vqe(
+    hamiltonian=hamiltonian,
+    ansatz=ansatz,
+    initial_params=initial_params,
+    max_iterations=200,
+)
+
+print(f"Ground state energy: {result.optimal_energy:.6f}")
+print(f"Converged: {result.converged}")
+```
+
+**Run QAOA for optimization:**
+```python
+from qconduit.variational import run_qaoa
+
+# High-level QAOA API
+qaoa_result = run_qaoa(
+    cost_hamiltonian=maxcut_hamiltonian,
+    num_qubits=5,
+    depth=2,
+    max_iterations=150,
+)
+
+print(f"Optimal cost: {qaoa_result.optimal_energy:.6f}")
+```
+
+**Custom ansätze with result objects:**
+```python
+from qconduit.variational import HardwareEfficientAnsatz, evaluate_expectation_value
+
+ansatz = HardwareEfficientAnsatz(n_qubits=3, depth=2)
+params = torch.randn(ansatz.num_parameters)
+energy = evaluate_expectation_value(ansatz, hamiltonian, params)
+```
+
+### Circuit Transpilation for Hardware
+
+**Transpile to hardware-native gates:**
+```python
+from qconduit.transpile import transpile_to_rx_rz_cx_basis, transpile_to_clifford_t
+
+# Original circuit with various gates
+circuit = QuantumCircuit(n_qubits=3)
+circuit.add_gate("H", [0])
+circuit.add_gate("T", [1])
+circuit.add_gate("S", [2])
+circuit.add_gate("CNOT", [0, 1])
+
+# Transpile to RX, RZ, CNOT (common hardware basis)
+hardware_circuit = transpile_to_rx_rz_cx_basis(circuit)
+
+# Transpile to Clifford+T (for fault-tolerant quantum computing)
+clifford_t_circuit = transpile_to_clifford_t(circuit)
+
+# Analyze gate counts
+from qconduit.transpile import summarize_gate_counts
+summary = summarize_gate_counts(clifford_t_circuit)
+print(f"T-count: {summary.t_count}")  # Important for fault-tolerant computing
+print(f"Clifford count: {summary.clifford_count}")
+```
+
+**Gate decomposition:**
+```python
+from qconduit.transpile import decompose_h_to_rz_rx_rz
+
+# Decompose Hadamard gate
+circuit = QuantumCircuit(n_qubits=1)
+circuit.add_gate("H", [0])
+decompose_h_to_rz_rx_rz(circuit, qubit=0)  # Replaces H with RZ-RX-RZ
+```
+
+### Advanced Noise Modeling
+
+**Enhanced Kraus channels:**
+```python
+from qconduit.noise import (
+    bit_flip_channel,
+    phase_flip_channel,
+    generalized_amplitude_damping_channel,
+    two_qubit_depolarizing_channel,
+    compose_kraus_channels,
+)
+
+# Create various noise channels
+bit_flip = bit_flip_channel(p=0.01)
+phase_flip = phase_flip_channel(p=0.02)
+
+# Generalized amplitude damping (with temperature)
+amp_damp = generalized_amplitude_damping_channel(gamma=0.1, n_th=0.1)
+
+# Two-qubit correlated noise
+two_qubit_depol = two_qubit_depolarizing_channel(p=0.01)
+
+# Compose multiple noise channels (compose two at a time)
+combined_noise = compose_kraus_channels(bit_flip, phase_flip)
+
+# Apply to state
+from qconduit.noise import apply_kraus_channel_to_statevector
+noisy_state = apply_kraus_channel_to_statevector(
+    state, combined_noise, qubit=0, n_qubits=2
+)
+```
+
+### Exact vs Approximate Evolution
+
+**Compare exact and Trotter evolution:**
+```python
+from qconduit.evolution import (
+    exact_time_evolution_statevector,
+    TrotterSchedule,
+    evolve_state_trotter,
+)
+
+# Exact evolution (for small systems)
+evolved_exact = exact_time_evolution_statevector(
+    state, hamiltonian, time=0.5
+)
+
+# Trotter evolution (scales to larger systems)
+schedule = TrotterSchedule(
+    num_steps=10,
+    total_time=0.5,
+    order=1,  # First-order Trotter
+)
+evolved_trotter = evolve_state_trotter(
+    state, hamiltonian, schedule, n_qubits=2
+)
+
+# Compare fidelity
+fidelity = qc.fidelity(
+    qc.dm_from_statevector(evolved_exact),
+    qc.dm_from_statevector(evolved_trotter)
+)
+print(f"Fidelity: {fidelity.item():.6f}")
+
+# Use higher-order Trotter for better accuracy
+schedule_2nd = TrotterSchedule(
+    num_steps=10,
+    total_time=0.5,
+    order=2,  # Second-order symmetric Trotter
+)
 ```
 
 ### Parameter Sweeps for Algorithm Exploration
@@ -1912,7 +2608,7 @@ We welcome contributions! Here's how to get started:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/Quantum_Conduit.git
+   git clone https://github.com/seansimms/Quantum_Conduit.git
    cd Quantum_Conduit
    ```
 
@@ -1955,6 +2651,33 @@ pytest
 7. Push to the branch (`git push origin feature/amazing-feature`)
 8. Open a Pull Request
 
+## Citation
+
+If you use Quantum Conduit in your research, please cite it as:
+
+**APA:**
+```
+Simms, S. (2025). Quantum Conduit: A PyTorch-native quantum statevector plumbing library for quantum machine learning (Version 0.0.1) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.17599984
+```
+
+**BibTeX:**
+```bibtex
+@software{simms2025quantum,
+  author       = {Simms, Sean},
+  title        = {Quantum Conduit: A PyTorch-native quantum statevector 
+                  plumbing library for quantum machine learning},
+  version      = {0.0.1},
+  month        = {11},
+  year         = {2025},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.17599984},
+  url          = {https://doi.org/10.5281/zenodo.17599984}
+}
+```
+
+**Citation File Format:**
+The repository includes a `CITATION.cff` file that can be used by citation management tools.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -1965,6 +2688,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for the quantum machine learning community**
 
-[Report Bug](https://github.com/yourusername/Quantum_Conduit/issues) • [Request Feature](https://github.com/yourusername/Quantum_Conduit/issues) • [Documentation](https://github.com/yourusername/Quantum_Conduit)
+[Report Bug](https://github.com/seansimms/Quantum_Conduit/issues) • [Request Feature](https://github.com/seansimms/Quantum_Conduit/issues) • [Documentation](https://github.com/seansimms/Quantum_Conduit)
 
 </div>

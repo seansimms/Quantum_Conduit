@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Quantum Conduit: A PyTorch-native quantum statevector plumbing library for quantum machine learning"
+version: 0.0.1
+doi: 10.5281/zenodo.17599984
+date-released: 2025-11-13
+authors:
+  - family-names: Simms
+    given-names: Sean
+    affiliation: "Independent Researcher"
+    orcid: ""
+license: MIT
+repository-code: "https://github.com/seansimms/Quantum_Conduit"
+abstract: "Quantum Conduit is a minimal, PyTorch-native quantum statevector library designed specifically for quantum machine learning applications. Unlike high-level quantum frameworks, Quantum Conduit provides clean, low-level abstractions that integrate seamlessly with PyTorch's computational graph, enabling native autograd support and batch processing for quantum operations."
+keywords:
+  - quantum computing
+  - quantum machine learning
+  - pytorch
+  - variational quantum algorithms
+  - VQE
+  - QAOA
+  - quantum statevector
+  - quantum simulation
+  - quantum chemistry
+  - quantum optimization
+
