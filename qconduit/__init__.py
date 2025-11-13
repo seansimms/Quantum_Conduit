@@ -28,6 +28,11 @@ from .backend import (
     apply_two_qubit_gate,
     measure_expectation_z,
     measure_probs,
+    zero_dm_state,
+    dm_from_statevector,
+    apply_kraus_single_qubit,
+    measure_probs_dm,
+    measure_expectation_z_dm,
 )
 
 # Operators
@@ -36,6 +41,15 @@ from .operators import (
     PauliSum,
     expectation_pauli_term,
     expectation_pauli_sum,
+    expectation_pauli_sum_dm,
+)
+
+# Noise models
+from .noise import (
+    NoiseModel,
+    DepolarizingChannel,
+    AmplitudeDampingChannel,
+    PhaseDampingChannel,
 )
 
 # Gradients
@@ -68,11 +82,22 @@ __all__ = [
     "apply_two_qubit_gate",
     "measure_expectation_z",
     "measure_probs",
+    "zero_dm_state",
+    "dm_from_statevector",
+    "apply_kraus_single_qubit",
+    "measure_probs_dm",
+    "measure_expectation_z_dm",
     # Operators
     "PauliTerm",
     "PauliSum",
     "expectation_pauli_term",
     "expectation_pauli_sum",
+    "expectation_pauli_sum_dm",
     # Gradients
     "param_shift_energy",
+    # Noise
+    "NoiseModel",
+    "DepolarizingChannel",
+    "AmplitudeDampingChannel",
+    "PhaseDampingChannel",
 ]

@@ -15,7 +15,7 @@ advanced optimizations.
 from __future__ import annotations
 
 import math
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import torch
 from torch.autograd import Function
@@ -23,7 +23,10 @@ from torch.autograd import Function
 from qconduit.core.device import Device
 from qconduit.layers.ansatzes import ParametricAnsatz
 from qconduit.operators.pauli import PauliSum
-from qconduit.operators.expectation import expectation_pauli_sum
+from qconduit.operators.expectation import expectation_pauli_sum, expectation_pauli_sum_dm
+
+if TYPE_CHECKING:
+    from qconduit.noise import NoiseModel
 
 # Type alias for Hamiltonian representations
 HamiltonianLike = Union[torch.Tensor, PauliSum]
@@ -34,13 +37,18 @@ def evaluate_energy(
     hamiltonian: HamiltonianLike,
     params: torch.Tensor,
     device: Device | None = None,
+    noise_model: "NoiseModel | None" = None,
 ) -> torch.Tensor:
     """
     Compute the energy E(theta) = <psi(theta)| H |psi(theta)>.
 
     This uses the existing ansatz and Hamiltonian plumbing only:
     - If `hamiltonian` is a 1D real tensor, it is treated as a diagonal in the computational basis.
-    - If `hamiltonian` is a PauliSum, it is evaluated with `expectation_pauli_sum`.
+    - If `hamiltonian` is a PauliSum, it is evaluated with `expectation_pauli_sum` or
+      `expectation_pauli_sum_dm` depending on whether noise is present.
+
+    If `noise_model` is provided, the energy is computed using the noisy density matrix
+    Tr(ρ_noisy H) instead of the pure state expectation.
 
     `params` is expected to be a 1D tensor of length equal to ansatz.num_parameters.
 
@@ -49,6 +57,7 @@ def evaluate_energy(
         hamiltonian: Either a diagonal 1D tensor or a PauliSum.
         params: 1D tensor of parameters.
         device: Optional Device; if None, ansatz.device is used.
+        noise_model: Optional NoiseModel to apply to the state before computing energy.
 
     Returns:
         A scalar tensor (0-D) with real dtype containing the energy.
@@ -72,35 +81,72 @@ def evaluate_energy(
     # Build state using ansatz
     state = ansatz(params)
 
-    # Compute energy based on Hamiltonian type
-    if isinstance(hamiltonian, PauliSum):
-        # PauliSum path
-        if hamiltonian.n_qubits() != ansatz.n_qubits:
-            raise ValueError(
-                f"hamiltonian.n_qubits() = {hamiltonian.n_qubits()} does not "
-                f"match ansatz.n_qubits = {ansatz.n_qubits}"
-            )
-        energy = expectation_pauli_sum(state, hamiltonian)
+    # Handle noise if present
+    if noise_model is None:
+        # Noiseless path: use pure state expectations
+        if isinstance(hamiltonian, PauliSum):
+            # PauliSum path
+            if hamiltonian.n_qubits() != ansatz.n_qubits:
+                raise ValueError(
+                    f"hamiltonian.n_qubits() = {hamiltonian.n_qubits()} does not "
+                    f"match ansatz.n_qubits = {ansatz.n_qubits}"
+                )
+            energy = expectation_pauli_sum(state, hamiltonian)
+        else:
+            # Diagonal tensor path
+            if hamiltonian.dim() != 1:
+                raise ValueError(
+                    f"Diagonal hamiltonian must be 1D tensor, got shape {hamiltonian.shape}"
+                )
+            if hamiltonian.shape[0] != state.shape[-1]:
+                raise ValueError(
+                    f"hamiltonian length {hamiltonian.shape[0]} does not match "
+                    f"state dimension {state.shape[-1]}"
+                )
+
+            # Compute probabilities: |state|²
+            probs = torch.abs(state) ** 2  # real
+
+            # Move hamiltonian to correct device and dtype
+            hamiltonian = hamiltonian.to(dtype=probs.dtype, device=probs.device)
+
+            # Compute energy: sum over probabilities * diagonal elements
+            energy = (probs * hamiltonian).sum(dim=-1)
     else:
-        # Diagonal tensor path
-        if hamiltonian.dim() != 1:
-            raise ValueError(
-                f"Diagonal hamiltonian must be 1D tensor, got shape {hamiltonian.shape}"
-            )
-        if hamiltonian.shape[0] != state.shape[-1]:
-            raise ValueError(
-                f"hamiltonian length {hamiltonian.shape[0]} does not match "
-                f"state dimension {state.shape[-1]}"
-            )
+        # Noisy path: use density matrix expectations
+        from qconduit.backend.density_matrix import dm_from_statevector, measure_probs_dm
 
-        # Compute probabilities: |state|²
-        probs = torch.abs(state) ** 2  # real
+        n_qubits = ansatz.n_qubits
+        rho = noise_model.apply_statevector(state, n_qubits=n_qubits)
 
-        # Move hamiltonian to correct device and dtype
-        hamiltonian = hamiltonian.to(dtype=probs.dtype, device=probs.device)
+        if isinstance(hamiltonian, PauliSum):
+            # PauliSum path with density matrix
+            if hamiltonian.n_qubits() != n_qubits:
+                raise ValueError(
+                    f"hamiltonian.n_qubits() = {hamiltonian.n_qubits()} does not "
+                    f"match ansatz.n_qubits = {n_qubits}"
+                )
+            energy = expectation_pauli_sum_dm(rho, hamiltonian)
+        else:
+            # Diagonal tensor path with density matrix
+            if hamiltonian.dim() != 1:
+                raise ValueError(
+                    f"Diagonal hamiltonian must be 1D tensor, got shape {hamiltonian.shape}"
+                )
+            if hamiltonian.shape[0] != 2**n_qubits:
+                raise ValueError(
+                    f"hamiltonian length {hamiltonian.shape[0]} does not match "
+                    f"2**n_qubits = {2**n_qubits}"
+                )
 
-        # Compute energy: sum over probabilities * diagonal elements
-        energy = (probs * hamiltonian).sum(dim=-1)
+            # Get diagonal of density matrix
+            diag = rho.diagonal(dim1=-2, dim2=-1).real
+
+            # Move hamiltonian to correct device and dtype
+            hamiltonian = hamiltonian.to(dtype=diag.dtype, device=diag.device)
+
+            # Compute energy: sum over diagonal * hamiltonian elements
+            energy = (diag * hamiltonian).sum(dim=-1)
 
     # Ensure result is scalar (0-D tensor) and real
     if energy.dim() > 0:
@@ -135,6 +181,7 @@ class ParamShiftEnergy(Function):
         hamiltonian: HamiltonianLike,
         device: Device | None,
         shift: float,
+        noise_model: "NoiseModel | None",
     ) -> torch.Tensor:
         """
         Forward pass: compute energy.
@@ -146,18 +193,22 @@ class ParamShiftEnergy(Function):
             hamiltonian: Hamiltonian (diagonal tensor or PauliSum).
             device: Optional Device.
             shift: Parameter-shift amount (typically π/2).
+            noise_model: Optional NoiseModel.
 
         Returns:
             Scalar energy tensor.
         """
         # Compute energy
-        energy = evaluate_energy(ansatz, hamiltonian, params, device=device)
+        energy = evaluate_energy(
+            ansatz, hamiltonian, params, device=device, noise_model=noise_model
+        )
 
         # Save context for backward
         ctx.ansatz = ansatz
         ctx.hamiltonian = hamiltonian
         ctx.device = device
         ctx.shift = shift
+        ctx.noise_model = noise_model
         ctx.num_params = params.numel()
 
         # Save params for backward (detached, as we'll modify copies)
@@ -184,6 +235,7 @@ class ParamShiftEnergy(Function):
         hamiltonian = ctx.hamiltonian
         device = ctx.device
         shift = ctx.shift
+        noise_model = ctx.noise_model
         num_params = ctx.num_params
 
         # Retrieve saved params
@@ -208,9 +260,11 @@ class ParamShiftEnergy(Function):
                 params_minus[i] -= shift
 
                 # Compute energies at shifted points
-                e_plus = evaluate_energy(ansatz, hamiltonian, params_plus, device=device)
+                e_plus = evaluate_energy(
+                    ansatz, hamiltonian, params_plus, device=device, noise_model=noise_model
+                )
                 e_minus = evaluate_energy(
-                    ansatz, hamiltonian, params_minus, device=device
+                    ansatz, hamiltonian, params_minus, device=device, noise_model=noise_model
                 )
 
                 # Apply parameter-shift rule
@@ -222,8 +276,8 @@ class ParamShiftEnergy(Function):
             grad_output = grad_output.squeeze()
         grad_params = grad_params * grad_output.to(grad_params.dtype)
 
-        # Return gradients: (params, ansatz, hamiltonian, device, shift)
-        return grad_params, None, None, None, None
+        # Return gradients: (params, ansatz, hamiltonian, device, shift, noise_model)
+        return grad_params, None, None, None, None, None
 
 
 def param_shift_energy(
@@ -232,6 +286,7 @@ def param_shift_energy(
     params: torch.Tensor,
     device: Device | None = None,
     shift: float = math.pi / 2.0,
+    noise_model: "NoiseModel | None" = None,
 ) -> torch.Tensor:
     """
     Compute the energy E(theta) with a custom autograd path using
@@ -253,6 +308,8 @@ def param_shift_energy(
         Optional Device; if None, ansatz.device is used.
     shift:
         Parameter-shift amount (defaults to π/2).
+    noise_model:
+        Optional NoiseModel to apply before computing energy.
 
     Returns
     -------
@@ -269,5 +326,5 @@ def param_shift_energy(
     >>> energy.backward()
     >>> print(params.grad)  # Gradient computed via parameter-shift
     """
-    return ParamShiftEnergy.apply(params, ansatz, hamiltonian, device, shift)
+    return ParamShiftEnergy.apply(params, ansatz, hamiltonian, device, shift, noise_model)
 

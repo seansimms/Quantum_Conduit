@@ -10,11 +10,11 @@ from torch import nn
 from ..core.device import Device
 from ..layers.ansatzes import ParametricAnsatz
 from ..operators.pauli import PauliSum
-from ..operators.expectation import expectation_pauli_sum
+from ..operators.expectation import expectation_pauli_sum, expectation_pauli_sum_dm
 from ..grad import param_shift_energy
 
 if TYPE_CHECKING:
-    pass
+    from ..noise import NoiseModel
 
 
 def ensure_hamiltonian_diag(
@@ -82,6 +82,9 @@ class VQE(nn.Module):
         device: Device specification. If None, uses the ansatz's device.
         use_param_shift: If True, use parameter-shift gradients instead of direct
             autograd. Defaults to False.
+        noise_model: Optional NoiseModel to apply before computing energy.
+            If None, uses pure state expectations. If provided, uses density matrix
+            expectations Tr(ρ_noisy H).
 
     Attributes:
         ansatz: ParametricAnsatz instance.
@@ -110,6 +113,7 @@ class VQE(nn.Module):
         hamiltonian: torch.Tensor | PauliSum,
         device: Device | None = None,
         use_param_shift: bool = False,
+        noise_model: "NoiseModel | None" = None,
     ) -> None:
         """Initialize a VQE instance."""
         super().__init__()
@@ -119,6 +123,7 @@ class VQE(nn.Module):
 
         self.ansatz = ansatz
         self.use_param_shift = use_param_shift
+        self.noise_model = noise_model
 
         # Determine device
         if device is None:
@@ -210,33 +215,58 @@ class VQE(nn.Module):
                 hamiltonian=hamiltonian,
                 params=params,
                 device=self.device,
+                noise_model=self.noise_model,
             )
 
-        # Existing direct-autograd path (unchanged)
+        # Direct-autograd path
         # Build quantum state using the ansatz
         state = self.ansatz(params)  # shape: (2**n_qubits,) or (batch_size, 2**n_qubits)
 
-        # Compute energy based on Hamiltonian type
-        if self.hamiltonian_diag is not None:
-            # Diagonal Hamiltonian path
-            # Compute probabilities: |state|²
-            probs = torch.abs(state) ** 2  # shape: same as state
+        # Handle noise if present
+        if self.noise_model is None:
+            # Noiseless path: use pure state expectations
+            if self.hamiltonian_diag is not None:
+                # Diagonal Hamiltonian path
+                # Compute probabilities: |state|²
+                probs = torch.abs(state) ** 2  # shape: same as state
 
-            # Compute energy as expectation of diagonal Hamiltonian
-            # probs: (..., 2**n_qubits)
-            # hamiltonian_diag: (2**n_qubits,)
-            # We need to broadcast and sum over the last dimension
-            energy = (probs * self.hamiltonian_diag).sum(dim=-1)
+                # Compute energy as expectation of diagonal Hamiltonian
+                # probs: (..., 2**n_qubits)
+                # hamiltonian_diag: (2**n_qubits,)
+                # We need to broadcast and sum over the last dimension
+                energy = (probs * self.hamiltonian_diag).sum(dim=-1)
 
-            # Ensure result is real (should already be, but explicit for clarity)
-            return energy.real
-        elif self.hamiltonian_pauli is not None:
-            # Pauli-sum Hamiltonian path
-            energy = expectation_pauli_sum(state, self.hamiltonian_pauli)
-            return energy
+                # Ensure result is real (should already be, but explicit for clarity)
+                return energy.real
+            elif self.hamiltonian_pauli is not None:
+                # Pauli-sum Hamiltonian path
+                energy = expectation_pauli_sum(state, self.hamiltonian_pauli)
+                return energy
+            else:
+                raise RuntimeError(
+                    "Neither hamiltonian_diag nor hamiltonian_pauli is set. "
+                    "This should not occur if VQE is constructed correctly."
+                )
         else:
-            raise RuntimeError(
-                "Neither hamiltonian_diag nor hamiltonian_pauli is set. "
-                "This should not occur if VQE is constructed correctly."
-            )
+            # Noisy path: use density matrix expectations
+            from ..backend.density_matrix import dm_from_statevector
+
+            n_qubits = self.ansatz.n_qubits
+            rho = self.noise_model.apply_statevector(state, n_qubits=n_qubits)
+
+            if self.hamiltonian_diag is not None:
+                # Diagonal Hamiltonian path with density matrix
+                diag = rho.diagonal(dim1=-2, dim2=-1).real
+                diag_H = self.hamiltonian_diag.to(dtype=diag.dtype, device=diag.device)
+                energy = (diag * diag_H).sum(dim=-1)
+                return energy
+            elif self.hamiltonian_pauli is not None:
+                # Pauli-sum Hamiltonian path with density matrix
+                energy = expectation_pauli_sum_dm(rho, self.hamiltonian_pauli)
+                return energy
+            else:
+                raise RuntimeError(
+                    "Neither hamiltonian_diag nor hamiltonian_pauli is set. "
+                    "This should not occur if VQE is constructed correctly."
+                )
 

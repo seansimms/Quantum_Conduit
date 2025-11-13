@@ -254,3 +254,61 @@ def expectation_pauli_sum(state: torch.Tensor, hamiltonian: PauliSum) -> torch.T
 
     return total
 
+
+def expectation_pauli_sum_dm(
+    rho: torch.Tensor,
+    hamiltonian: PauliSum,
+) -> torch.Tensor:
+    """
+    Compute <H> = Tr(rho H) for a PauliSum Hamiltonian and density matrix rho.
+
+    This uses hamiltonian.to_matrix() internally and is intended for small n_qubits.
+    This is standard linear algebra: Tr(ρH) = sum_{i,j} rho_{ij} H_{ji}.
+
+    Args:
+        rho: Density matrix tensor of shape (..., dim, dim) with complex dtype.
+        hamiltonian: PauliSum with n_qubits matching the density matrix dimension.
+
+    Returns:
+        Real tensor with shape matching the batch dimensions of rho
+        (without the dim, dim dimensions), containing the expectation value.
+
+    Raises:
+        ValueError: If rho is not square, dimensions don't match, or n_qubits is too large.
+    """
+    if rho.shape[-1] != rho.shape[-2]:
+        raise ValueError(
+            f"rho must be square in last two dimensions, got shape {rho.shape}"
+        )
+
+    dim = rho.shape[-1]
+    n_qubits = hamiltonian.n_qubits()
+
+    if n_qubits == 0:
+        # Empty Hamiltonian: expectation is 0
+        batch_shape = rho.shape[:-2]
+        if len(batch_shape) == 0:
+            return torch.tensor(0.0, dtype=rho.real.dtype, device=rho.device)
+        else:
+            return torch.zeros(
+                batch_shape, dtype=rho.real.dtype, device=rho.device
+            )
+
+    if 2**n_qubits != dim:
+        raise ValueError(
+            f"rho dimension {dim} does not match 2**n_qubits = {2**n_qubits} "
+            f"for Hamiltonian with {n_qubits} qubits"
+        )
+
+    # Compute full Hamiltonian matrix
+    H = hamiltonian.to_matrix(dtype=rho.dtype, device=rho.device)
+
+    # Compute Tr(rho H) = sum_{i,j} rho_{ij} H_{ji}
+    # For batched rho: (..., dim, dim) @ (dim, dim) -> (..., dim, dim)
+    M = torch.matmul(rho, H)
+
+    # Extract trace: sum of diagonal elements
+    tr = M.diagonal(dim1=-2, dim2=-1).sum(dim=-1).real
+
+    return tr
+
