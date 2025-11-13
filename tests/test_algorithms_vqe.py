@@ -8,6 +8,7 @@ import torch
 from qconduit.algorithms.vqe import VQE, ensure_hamiltonian_diag
 from qconduit.core.device import default_device
 from qconduit.layers.ansatzes import HardwareEfficientAnsatz
+from qconduit.operators import PauliSum, PauliTerm
 
 
 class TestEnsureHamiltonianDiag:
@@ -204,4 +205,150 @@ class TestVQE:
         # Energy should be low (close to 0)
         final_energy = vqe.energy(params).item()
         assert final_energy < 0.5  # Should be significantly below 1.0
+
+
+class TestVQEPauliSum:
+    """Tests for VQE with PauliSum Hamiltonians."""
+
+    def test_vqe_initialization_pauli_sum(self):
+        """Test VQE can be initialized with PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+        assert vqe.ansatz == ansatz
+        assert vqe.hamiltonian_pauli is not None
+        assert vqe.hamiltonian_diag is None
+        assert vqe.hamiltonian_pauli.n_qubits() == 1
+
+    def test_vqe_energy_pauli_sum_1_qubit_ground_state(self):
+        """Test VQE energy for 1-qubit system with |0⟩ state using PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        # Hamiltonian: H = Z, so |0⟩ has energy +1, |1⟩ has energy -1
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Parameters that produce |0⟩ state (theta=0)
+        params = torch.tensor([0.0])
+        energy = vqe.energy(params)
+
+        # Should be close to +1.0 (energy of |0⟩ for H=Z)
+        assert torch.allclose(energy, torch.tensor(1.0), atol=1e-5)
+
+    def test_vqe_energy_pauli_sum_1_qubit_excited_state(self):
+        """Test VQE energy for 1-qubit system with |1⟩ state using PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Parameters that produce |1⟩ state (theta=π)
+        params = torch.tensor([math.pi])
+        energy = vqe.energy(params)
+
+        # Should be close to -1.0 (energy of |1⟩ for H=Z)
+        assert torch.allclose(energy, torch.tensor(-1.0), atol=1e-5)
+
+    def test_vqe_forward_alias_pauli_sum(self):
+        """Test VQE.forward() is an alias for energy() with PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+
+        params = torch.tensor([0.0])
+        energy1 = vqe.energy(params)
+        energy2 = vqe.forward(params)
+
+        assert torch.allclose(energy1, energy2)
+
+    def test_vqe_energy_batch_mode_pauli_sum(self):
+        """Test VQE energy works in batch mode with PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Batch: first element produces |0⟩, second produces |1⟩
+        params = torch.tensor([[0.0], [math.pi]])
+        energy = vqe.energy(params)
+
+        assert energy.shape == (2,)
+        assert torch.allclose(energy[0], torch.tensor(1.0), atol=1e-5)
+        assert torch.allclose(energy[1], torch.tensor(-1.0), atol=1e-5)
+
+    def test_vqe_gradient_pauli_sum(self):
+        """Test that gradients flow through VQE with PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+
+        params = torch.tensor([0.5], requires_grad=True)
+        energy = vqe.energy(params)
+
+        # Backward pass
+        energy.backward()
+
+        # Check gradients exist and are finite
+        assert params.grad is not None
+        assert torch.isfinite(params.grad).all()
+
+    def test_vqe_optimization_pauli_sum(self):
+        """Test VQE can be used in an optimization loop with PauliSum."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        # Hamiltonian: H = Z, ground state is |1⟩ with energy -1
+        term = PauliTerm(1.0, ("Z",))
+        hamiltonian = PauliSum.from_terms([term])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # Initialize parameters away from critical point (params=0 has zero gradient)
+        # Start at a small positive value where gradient is non-zero
+        params = torch.nn.Parameter(torch.tensor([0.1]))  # Start near |0⟩ but with non-zero gradient
+
+        # Optimizer
+        optimizer = torch.optim.SGD([params], lr=0.1)
+
+        # Store initial energy
+        initial_energy = vqe.energy(params).item()
+
+        # Run optimization steps
+        for _ in range(20):
+            optimizer.zero_grad()
+            energy = vqe.energy(params)
+            energy.backward()
+            optimizer.step()
+
+        # Final energy should be lower than initial (gradients are working)
+        final_energy = vqe.energy(params).item()
+        assert final_energy < initial_energy
+
+        # The important thing is that optimization is making progress
+        # (gradients are flowing correctly). Full convergence may require
+        # more steps or better hyperparameters, but we've verified gradients work.
+        # Energy should be significantly lower than the starting point
+        assert final_energy < initial_energy * 0.9  # At least 10% improvement
+
+    def test_vqe_pauli_sum_wrong_n_qubits(self):
+        """Test VQE raises for PauliSum with wrong n_qubits."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        term = PauliTerm(1.0, ("Z", "Z"))  # 2-qubit term
+        hamiltonian = PauliSum.from_terms([term])
+        with pytest.raises(ValueError, match="does not match"):
+            VQE(ansatz, hamiltonian)
+
+    def test_vqe_pauli_sum_multiple_terms(self):
+        """Test VQE with PauliSum containing multiple terms."""
+        ansatz = HardwareEfficientAnsatz(n_qubits=1, depth=1)
+        # H = 0.5 * Z + 0.5 * X
+        term_z = PauliTerm(0.5, ("Z",))
+        term_x = PauliTerm(0.5, ("X",))
+        hamiltonian = PauliSum.from_terms([term_z, term_x])
+        vqe = VQE(ansatz, hamiltonian)
+
+        # For |0⟩: ⟨Z⟩ = 1, ⟨X⟩ = 0, so energy = 0.5
+        params = torch.tensor([0.0])
+        energy = vqe.energy(params)
+        assert torch.allclose(energy, torch.tensor(0.5), atol=1e-5)
 
