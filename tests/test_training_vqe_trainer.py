@@ -204,3 +204,4 @@ def test_vqe_trainer_multiple_callbacks() -> None:
     assert len(records2) == 5
     assert records1 == records2
 
+

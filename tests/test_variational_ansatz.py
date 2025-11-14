@@ -157,3 +157,4 @@ class TestQAOAAnsatz:
         # Should start with H, then have cost and mixer gates
         assert circuit.ops[0].name == "H"
 
+

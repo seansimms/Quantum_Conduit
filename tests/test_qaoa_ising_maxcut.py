@@ -155,3 +155,4 @@ def test_ising_maxcut_hamiltonian_self_loop_skipped() -> None:
     assert abs(const_coeff - 0.5) < 1e-8
     assert abs(zz_coeff + 0.5) < 1e-8
 
+

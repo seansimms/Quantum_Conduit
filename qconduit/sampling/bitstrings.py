@@ -281,3 +281,4 @@ def sample_bitstrings_circuit(
     # For a non-batched state, samples will have shape (n_shots, len(qubits))
     return samples
 
+

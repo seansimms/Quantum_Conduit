@@ -211,3 +211,4 @@ def test_channel_parameter_validation():
     with pytest.raises(ValueError):
         two_qubit_depolarizing_channel(1.1)
 
+

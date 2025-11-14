@@ -194,3 +194,4 @@ def marginalize_probs(
         marg[..., j] += probs[..., i]
     return marg
 
+

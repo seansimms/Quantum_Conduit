@@ -382,3 +382,4 @@ class TestNormalizationDiagnostics:
         probs = qc.measure_probs(state, n_qubits=2)
         assert torch.allclose(probs.sum(), torch.tensor(1.0), atol=1e-6)
 
+

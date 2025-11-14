@@ -424,3 +424,4 @@ class TestTermDecompositionCorrectness:
         phased = evolved * global_phase.conj()
         assert torch.allclose(phased, analytic, atol=1e-3)
 
+
