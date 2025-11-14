@@ -87,3 +87,4 @@ def test_build_circuit_circuit_properties() -> None:
             assert len(op.qubits) == 2
             assert op.params is None
 
+

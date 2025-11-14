@@ -250,3 +250,4 @@ class TestTrotterCircuits:
         # Circuit should still be valid (identity term adds no gates)
         assert circuit.n_qubits == n_qubits
 
+

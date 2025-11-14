@@ -216,3 +216,4 @@ def exact_ground_state(
 
     return ground_energy, ground_state
 
+

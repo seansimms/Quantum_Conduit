@@ -149,3 +149,4 @@ def test_param_shift_multiple_parameters():
     # At least some should be non-zero for this setup
     assert torch.any(torch.abs(grad_ps) > 1e-6)
 
+

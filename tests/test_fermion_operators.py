@@ -150,3 +150,4 @@ class TestFermionOperator:
         result = op1.__add__("not an operator")
         assert result is NotImplemented
 
+

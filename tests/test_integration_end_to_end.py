@@ -257,3 +257,4 @@ class TestSweepsVQEOAOA:
         assert result_2d.y_points.dtype in [torch.float32, torch.float64]
         assert result_2d.values.dtype in [torch.float32, torch.float64]
 
+

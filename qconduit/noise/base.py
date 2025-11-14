@@ -54,3 +54,4 @@ class NoiseModel(ABC):
         rho = dm_from_statevector(state)
         return self.apply_density_matrix(rho, n_qubits=n_qubits)
 
+

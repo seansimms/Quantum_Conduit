@@ -231,3 +231,4 @@ class TestExpectationConsistencyWithMatrix:
         exp_matrix = (state_01_conj @ (h_matrix @ state_01)).real
         assert torch.allclose(exp_expectation, exp_matrix, atol=1e-6)
 
+

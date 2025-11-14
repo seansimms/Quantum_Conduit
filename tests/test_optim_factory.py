@@ -84,3 +84,4 @@ def test_create_optimizer_case_insensitive() -> None:
     opt = create_optimizer(config, [p])
     assert isinstance(opt, torch.optim.SGD)
 
+

@@ -168,3 +168,4 @@ class TestRunQAOA:
         # Ground state energy is -2 (both qubits in |1⟩)
         assert result.optimal_value < 0.0
 
+

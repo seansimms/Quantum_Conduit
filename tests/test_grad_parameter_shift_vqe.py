@@ -173,3 +173,4 @@ class TestVQEParameterShiftGradient:
         # This is consistent with moving toward θ=π where energy is minimum (-1)
         assert grad[0].item() < 0
 
+

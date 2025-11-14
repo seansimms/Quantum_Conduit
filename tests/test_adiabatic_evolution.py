@@ -303,3 +303,4 @@ def test_adiabatic_evolve_state_2d_state():
     with pytest.raises(ValueError, match="initial_state must be 1D"):
         adiabatic_evolve_state(bad_state, H0, H1, config)
 
+
