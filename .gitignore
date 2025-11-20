@@ -47,3 +47,9 @@ dmypy.json
 # Ruff
 .ruff_cache/
 
+# Internal documentation (not for public repo)
+WEBSITE_COPY.md
+LINKEDIN_POST.md
+AUDIT_REPORT*.md
+RECOMMENDATIONS*.md
+
