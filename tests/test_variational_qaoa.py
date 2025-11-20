@@ -169,3 +169,4 @@ class TestRunQAOA:
         assert result.optimal_value < 0.0
 
 
+

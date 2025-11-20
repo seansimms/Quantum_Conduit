@@ -212,3 +212,4 @@ def test_channel_parameter_validation():
         two_qubit_depolarizing_channel(1.1)
 
 
+

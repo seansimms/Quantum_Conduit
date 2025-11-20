@@ -151,3 +151,4 @@ class TestFermionOperator:
         assert result is NotImplemented
 
 
+

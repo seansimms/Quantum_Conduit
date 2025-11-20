@@ -174,3 +174,4 @@ class TestVQEParameterShiftGradient:
         assert grad[0].item() < 0
 
 
+

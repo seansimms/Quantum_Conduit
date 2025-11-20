@@ -216,3 +216,4 @@ class TestSimpleQAOAEnergyCheck:
         assert min_energy <= 0.5 + 1e-6
 
 
+

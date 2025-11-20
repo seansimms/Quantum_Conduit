@@ -8,7 +8,7 @@
 [![PyTorch 2.1+](https://img.shields.io/badge/PyTorch-2.1+-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://badge.fury.io/py/qconduit.svg)](https://badge.fury.io/py/qconduit)
-[![Version](https://img.shields.io/badge/version-0.0.1-blue.svg)](https://github.com/seansimms/Quantum_Conduit)
+[![Version](https://img.shields.io/badge/version-0.0.4-blue.svg)](https://github.com/seansimms/Quantum_Conduit)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17599984.svg)](https://doi.org/10.5281/zenodo.17599984)
 
 [Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Documentation](#api-reference) • [Examples](#examples)
@@ -75,6 +75,10 @@ Quantum Conduit provides a comprehensive set of quantum computing primitives opt
 - **🧬 Fermion-to-Qubit Mappings**: Jordan-Wigner and Bravyi-Kitaev transforms for quantum chemistry
 - **🔬 Quantum State Tomography**: Density matrix reconstruction from Pauli measurements
 - **⚙️ Circuit Transpilation**: Gate decomposition and basis set conversion for hardware compatibility
+- **🔌 Quantum Channels API**: Textbook quantum noise channels with Kraus operators
+- **📥 I/O Support**: OpenQASM 2.0 and JSON IR import/export for circuit interchange
+- **🔗 PyTorch Integration**: Native `nn.Module` integration with parameter-shift gradients
+- **📊 Visualization**: Circuit drawing, Bloch sphere visualization, and circuit analysis
 
 ## Installation
 
@@ -845,6 +849,216 @@ fidelity = qc.fidelity(
 print(f"Fidelity between exact and Trotter: {fidelity.item():.6f}")
 ```
 
+### Example 21: Quantum Channels
+
+```python
+import torch
+from qconduit.channels import (
+    KrausChannel,
+    DepolarizingChannel,
+    BitFlipChannel,
+    AmplitudeDampingChannel,
+    apply_circuit_with_noise,
+)
+from qconduit.circuit import QuantumCircuit
+
+# Create standard noise channels
+depol = DepolarizingChannel(p=0.01)  # 1% depolarizing noise
+bit_flip = BitFlipChannel(p=0.05)    # 5% bit-flip probability
+amp_damp = AmplitudeDampingChannel(gamma=0.1)  # Amplitude damping
+
+# Apply channel to a density matrix
+from qconduit.backend import zero_dm_state, dm_from_statevector
+from qconduit.backend.statevector import zero_state, apply_gate
+import qconduit as qc
+
+rho = zero_dm_state(n_qubits=1)
+# Apply depolarizing channel
+rho_noisy = depol.apply_to_density(rho)
+
+# Apply channel to a statevector (returns density matrix)
+psi = zero_state(n_qubits=1)
+psi = apply_gate(psi, qc.H(), qubit=0, n_qubits=1)
+rho_mixed = depol.apply_to_statevector(psi)
+
+# Simulate noisy circuit
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+
+# Apply noise after each gate
+channel_locations = [
+    (0, DepolarizingChannel(p=0.01)),  # Noise after H gate
+    (1, DepolarizingChannel(p=0.01)),  # Noise after CNOT gate
+]
+rho_final = apply_circuit_with_noise(circuit, channel_locations)
+print(f"Final density matrix shape: {rho_final.shape}")  # (4, 4)
+```
+
+### Example 22: Batched Operations
+
+```python
+import torch
+from qconduit.batched import (
+    BatchedState,
+    apply_circuit_to_batched_states,
+    evaluate_expectations_for_params_batched,
+)
+from qconduit.variational import HardwareEfficientAnsatz
+from qconduit.operators import PauliSum
+from qconduit.circuit import QuantumCircuit
+
+# Create a batch of states
+states = torch.randn(10, 4, dtype=torch.complex128)  # 10 states, 2 qubits each
+states = states / torch.linalg.norm(states, dim=1, keepdim=True)
+batched = BatchedState(states, n_qubits=2)
+
+# Apply circuit to all states at once
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+result = apply_circuit_to_batched_states(circuit, batched)
+print(f"Result shape: {result.states.shape}")  # (10, 4)
+
+# Batch evaluate many parameter sets
+ansatz = HardwareEfficientAnsatz(num_qubits=2, num_layers=2)
+params_batch = torch.randn(100, ansatz.num_parameters)  # 100 parameter vectors
+H = PauliSum.from_label("ZZ")
+energies = evaluate_expectations_for_params_batched(ansatz, params_batch, H)
+print(f"Energies shape: {energies.shape}")  # (100,)
+```
+
+### Example 23: Circuit I/O
+
+```python
+from qconduit.io import (
+    parse_qasm_string,
+    parse_qasm_file,
+    export_circuit_to_qasm,
+    circuit_to_json,
+    json_to_circuit,
+    dump_json_circuit,
+    load_json_circuit,
+)
+from qconduit.circuit import QuantumCircuit
+
+# Parse OpenQASM 2.0
+qasm = """OPENQASM 2.0;
+qreg q[2];
+h q[0];
+cx q[0],q[1];
+"""
+circuit = parse_qasm_string(qasm)
+
+# Export to QASM
+qasm_output = export_circuit_to_qasm(circuit)
+print(qasm_output)
+
+# JSON IR roundtrip
+json_data = circuit_to_json(circuit)
+circuit_restored = json_to_circuit(json_data)
+
+# File I/O
+dump_json_circuit(circuit, "circuit.json")
+circuit_loaded = load_json_circuit("circuit.json")
+
+# Parse from file
+circuit_from_file = parse_qasm_file("circuit.qasm")
+```
+
+### Example 24: PyTorch nn.Module Integration
+
+```python
+import torch
+import torch.nn as nn
+from qconduit.torch import QuantumModule
+from qconduit.variational import HardwareEfficientAnsatz
+from qconduit.operators import PauliSum, PauliTerm
+
+# Create a quantum module
+ansatz = HardwareEfficientAnsatz(num_qubits=2, num_layers=2)
+H = PauliSum.from_terms([PauliTerm(1.0, ("Z", "Z"))])
+module = QuantumModule(
+    ansatz=ansatz,
+    hamiltonian=H,
+    gradient_method="parameter_shift"  # or "autograd"
+)
+
+# Use in PyTorch training loop
+optimizer = torch.optim.Adam(module.parameters(), lr=0.1)
+for epoch in range(100):
+    optimizer.zero_grad()
+    energy = module()  # Forward pass
+    energy.backward()  # Backward pass (uses parameter-shift rule)
+    optimizer.step()
+    print(f"Epoch {epoch}: Energy = {energy.item():.6f}")
+
+# Integrate with classical neural networks
+class HybridModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.classical = nn.Linear(10, 2)
+        self.quantum = QuantumModule(ansatz, H)
+        self.head = nn.Linear(1, 1)
+    
+    def forward(self, x):
+        classical_out = self.classical(x)
+        quantum_energy = self.quantum()
+        return self.head(torch.cat([classical_out, quantum_energy.unsqueeze(0)]))
+```
+
+### Example 25: Visualization
+
+```python
+from qconduit.viz import (
+    print_circuit,
+    to_text,
+    bloch_coords_from_statevector,
+    plot_bloch_vector,
+    circuit_summary,
+    print_circuit_summary,
+)
+from qconduit.circuit import QuantumCircuit
+import qconduit as qc
+
+# Text circuit drawing
+circuit = QuantumCircuit(n_qubits=3)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+circuit.add_gate("RX", [2], [0.5])
+print_circuit(circuit)
+# Output:
+# q0: [H]─●───────
+# q1: ────⊕───────
+# q2: ───────[RX(0.5)]
+
+# Bloch sphere coordinates
+state = qc.zero_state(n_qubits=2)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=2)
+coords = bloch_coords_from_statevector(state, qubit_index=0, n_qubits=2)
+print(f"Bloch coordinates (x, y, z): {coords}")  # (1.0, 0.0, 0.0) for |+⟩
+
+# Plot Bloch vector (requires matplotlib)
+try:
+    plot_bloch_vector(coords)
+except RuntimeError:
+    print("matplotlib not available")
+
+# Circuit summary
+summary = circuit_summary(circuit)
+print_circuit_summary(circuit)
+# Output:
+# Circuit Summary
+# ==================================================
+# Qubits: 3
+# Total Gates: 3
+# Estimated Depth: 2
+# T-count: 0
+# Clifford-count: 2
+# Parameters: 1
+# Uses Parametric Gates: True
+```
+
 ## Architecture
 
 ### Design Principles
@@ -870,6 +1084,11 @@ qconduit/
 ├── operators/      # Pauli operators and expectations
 ├── grad/           # Gradient computation (parameter-shift)
 ├── noise/          # Noise models and quantum channels
+├── channels/       # Quantum channels API with Kraus operators
+├── batched/        # Batched operations for efficient training
+├── io/             # OpenQASM 2.0 and JSON IR import/export
+├── torch/          # PyTorch nn.Module integration
+├── viz/            # Visualization and circuit analysis
 ├── diagnostics/    # State validation and debugging tools
 ├── training/       # Training loops and utilities
 ├── sampling/       # Bitstring sampling and analysis
@@ -908,6 +1127,11 @@ qconduit/
 - **Measurement/Tomography**: Quantum state tomography and Pauli expectation measurements
 - **Variational Scaffolding**: High-level APIs for VQE and QAOA algorithms
 - **Transpilation**: Gate decomposition and basis set conversion for hardware
+- **Quantum Channels**: Textbook quantum noise channels with Kraus operators, channel composition, and circuit integration
+- **Batched Operations**: Efficient batch processing for multiple circuits, parameter sets, and states
+- **I/O Support**: OpenQASM 2.0 parser/exporter and JSON IR for circuit interchange
+- **PyTorch Integration**: Native `nn.Module` wrapper with parameter-shift gradients
+- **Visualization**: Circuit text drawing, Bloch sphere coordinates, and circuit summary utilities
 
 ## Examples
 
@@ -2074,6 +2298,316 @@ print(f"Converged in {history.num_steps()} steps")
 print(f"Best energy: {history.best_energy()}")
 ```
 
+### Quantum Channels API
+
+**Textbook quantum noise channels with Kraus operators:**
+
+```python
+from qconduit.channels import (
+    KrausChannel,
+    DepolarizingChannel,
+    BitFlipChannel,
+    PhaseFlipChannel,
+    PhaseDampingChannel,
+    AmplitudeDampingChannel,
+    GeneralKraus,
+    apply_circuit_with_noise,
+    NoisyCircuit,
+)
+
+# Create standard noise channels
+depol = DepolarizingChannel(p=0.01)  # 1% depolarizing noise
+bit_flip = BitFlipChannel(p=0.05)    # 5% bit-flip probability
+phase_flip = PhaseFlipChannel(p=0.03)  # 3% phase-flip probability
+phase_damp = PhaseDampingChannel(p=0.1)  # Phase damping
+amp_damp = AmplitudeDampingChannel(gamma=0.1)  # Amplitude damping
+
+# Apply channel to density matrix
+rho = qc.zero_dm_state(n_qubits=1)
+rho_noisy = depol.apply_to_density(rho)
+
+# Apply channel to statevector (returns density matrix)
+psi = qc.zero_state(n_qubits=1)
+psi = qc.apply_gate(psi, qc.H(), qubit=0, n_qubits=1)
+rho_mixed = depol.apply_to_statevector(psi)
+
+# Compose channels
+combined = depol.compose(bit_flip)  # Apply depol, then bit_flip
+
+# Create custom channel from Kraus operators
+kraus_ops = (K0, K1, K2)  # Tuple of 2x2 matrices
+custom_channel = GeneralKraus(kraus_ops)
+
+# Simulate noisy circuit
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+
+# Apply noise after specific gates
+channel_locations = [
+    (0, DepolarizingChannel(p=0.01)),  # Noise after gate 0 (H)
+    (1, DepolarizingChannel(p=0.01)),  # Noise after gate 1 (CNOT)
+]
+rho_final = apply_circuit_with_noise(circuit, channel_locations)
+
+# Channel properties
+is_cptp = depol.is_cptp()  # Check CPTP property
+superop = depol.as_superoperator()  # Get superoperator representation
+```
+
+**Limitations:**
+- `tensor_extend()` currently only supports single-qubit channels
+- For multi-qubit channels, construct full-system Kraus operators manually
+
+### Batched Operations
+
+**Efficient batch processing for multiple circuits and parameter sets:**
+
+```python
+from qconduit.batched import (
+    BatchedState,
+    apply_circuit_to_batched_states,
+    apply_ansatz_batch_to_state,
+    evaluate_expectations_batched_via_states,
+    evaluate_expectations_for_params_batched,
+)
+
+# Create batch of states
+states = torch.randn(100, 4, dtype=torch.complex128)  # 100 states, 2 qubits
+states = states / torch.linalg.norm(states, dim=1, keepdim=True)
+batched = BatchedState(states, n_qubits=2)
+
+# Apply circuit to all states at once
+circuit = QuantumCircuit(n_qubits=2)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+result = apply_circuit_to_batched_states(circuit, batched)
+print(f"Result shape: {result.states.shape}")  # (100, 4)
+
+# Batch evaluate many parameter sets (efficient for VQE)
+ansatz = HardwareEfficientAnsatz(num_qubits=2, num_layers=2)
+params_batch = torch.randn(1000, ansatz.num_parameters)  # 1000 parameter vectors
+H = PauliSum.from_label("ZZ")
+energies = evaluate_expectations_for_params_batched(ansatz, params_batch, H)
+print(f"Energies shape: {energies.shape}")  # (1000,)
+
+# Evaluate expectations for batch of states
+expectations = evaluate_expectations_batched_via_states(H, batched)
+print(f"Expectations shape: {expectations.shape}")  # (100,)
+
+# BatchedState utilities
+norms = batched.norms()  # Get norm of each state
+normalized = batched.renormalize()  # Normalize all states
+individual_states = batched.unstack()  # Get tuple of individual states
+```
+
+**Performance notes:**
+- Automatically uses vectorized operations when memory allows (B * dim² ≤ 1e8)
+- Falls back to per-row loops for large batches
+- All operations are deterministic and reproducible
+
+### Circuit I/O
+
+**OpenQASM 2.0 and JSON IR import/export:**
+
+```python
+from qconduit.io import (
+    parse_qasm_string,
+    parse_qasm_file,
+    export_circuit_to_qasm,
+    circuit_to_json,
+    json_to_circuit,
+    dump_json_circuit,
+    load_json_circuit,
+)
+
+# Parse OpenQASM 2.0 string
+qasm = """OPENQASM 2.0;
+qreg q[2];
+h q[0];
+cx q[0],q[1];
+rx(pi/4) q[0];
+"""
+circuit = parse_qasm_string(qasm)
+
+# Parse from file
+circuit = parse_qasm_file("circuit.qasm")
+
+# Export to QASM
+qasm_output = export_circuit_to_qasm(circuit, include_qelib=True)
+print(qasm_output)
+
+# JSON IR roundtrip
+json_data = circuit_to_json(circuit, metadata={"producer": "qconduit"})
+circuit_restored = json_to_circuit(json_data)
+
+# File I/O
+dump_json_circuit(circuit, "circuit.json")
+circuit_loaded = load_json_circuit("circuit.json")
+
+# Supported QASM features:
+# - Standard gates: h, x, y, z, s, t, sdg, tdg
+# - Rotation gates: rx, ry, rz with angle parameters
+# - Controlled gates: cx (CNOT)
+# - U gates: u1(λ), u2(φ,λ), u3(θ,φ,λ) - automatically decomposed
+# - Multiple qreg declarations
+# - Comments: // and /* */
+# - Safe angle parsing: supports pi, pi/2, 3*pi/4, etc.
+```
+
+**Supported QASM 2.0 subset:**
+- Standard gates: `h`, `x`, `y`, `z`, `s`, `t`, `sdg`, `tdg`
+- Rotation gates: `rx(θ)`, `ry(θ)`, `rz(θ)`
+- Controlled gates: `cx` (CNOT)
+- U gates: `u1(λ)`, `u2(φ,λ)`, `u3(θ,φ,λ)` (decomposed to RZ/RY)
+- Angle expressions: `pi`, `pi/2`, `3*pi/4`, arithmetic operations
+- Multiple `qreg` declarations
+- Comments: `//` and `/* */`
+
+**Unsupported features:**
+- OpenQASM 3.0
+- Custom gate definitions
+- Classical control flow (`if` statements)
+- Parameterized gates (only constant angles)
+
+### PyTorch nn.Module Integration
+
+**Native PyTorch module wrapper with parameter-shift gradients:**
+
+```python
+from qconduit.torch import QuantumModule
+from qconduit.variational import HardwareEfficientAnsatz
+from qconduit.operators import PauliSum, PauliTerm
+
+# Create quantum module
+ansatz = HardwareEfficientAnsatz(num_qubits=2, num_layers=2)
+H = PauliSum.from_terms([PauliTerm(1.0, ("Z", "Z"))])
+module = QuantumModule(
+    ansatz=ansatz,
+    hamiltonian=H,
+    gradient_method="parameter_shift",  # or "autograd"
+    init_params=None,  # Optional initial parameters
+    device=None,  # Optional device
+)
+
+# Use in PyTorch training loop
+optimizer = torch.optim.Adam(module.parameters(), lr=0.1)
+for epoch in range(100):
+    optimizer.zero_grad()
+    energy = module()  # Forward pass
+    energy.backward()  # Backward pass (uses parameter-shift rule)
+    optimizer.step()
+    print(f"Epoch {epoch}: Energy = {energy.item():.6f}")
+
+# Integrate with classical neural networks
+class HybridModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.classical = nn.Linear(10, 2)
+        self.quantum = QuantumModule(ansatz, H)
+        self.head = nn.Linear(3, 1)  # 2 (classical) + 1 (quantum)
+    
+    def forward(self, x):
+        classical_out = self.classical(x)
+        quantum_energy = self.quantum()
+        combined = torch.cat([classical_out, quantum_energy.unsqueeze(0)])
+        return self.head(combined)
+
+# Parameter management
+params = module.get_parameters()  # Get current parameters
+module.set_parameters(new_params)  # Set parameters
+
+# Device handling
+module = module.to(device=torch.device("cuda"))  # Move to GPU
+```
+
+**Gradient methods:**
+- `"parameter_shift"`: Uses deterministic parameter-shift rule (default)
+- `"autograd"`: Uses PyTorch autograd if backend supports it
+
+### Visualization
+
+**Circuit drawing, Bloch sphere visualization, and circuit analysis:**
+
+```python
+from qconduit.viz import (
+    print_circuit,
+    to_text,
+    bloch_coords_from_statevector,
+    bloch_coords_from_density,
+    plot_bloch_vector,
+    plot_bloch_projections,
+    circuit_summary,
+    print_circuit_summary,
+    compare_circuits,
+)
+
+# Text circuit drawing
+circuit = QuantumCircuit(n_qubits=3)
+circuit.add_gate("H", [0])
+circuit.add_gate("CNOT", [0, 1])
+circuit.add_gate("RX", [2], [0.5])
+print_circuit(circuit)
+# Output:
+# q0: [H]─●───────
+# q1: ────⊕───────
+# q2: ───────[RX(0.5)]
+
+# Get circuit text representation
+text_repr = to_text(circuit, max_width=80, use_ascii=False)
+
+# Bloch sphere coordinates
+state = qc.zero_state(n_qubits=2)
+state = qc.apply_gate(state, qc.H(), qubit=0, n_qubits=2)
+coords = bloch_coords_from_statevector(state, qubit_index=0, n_qubits=2)
+print(f"Bloch coordinates (x, y, z): {coords}")  # (1.0, 0.0, 0.0) for |+⟩
+
+# From density matrix
+rho = qc.dm_from_statevector(state)
+coords = bloch_coords_from_density(rho[0:2, 0:2])  # Single-qubit reduced density
+
+# Plot Bloch vector (requires matplotlib)
+try:
+    plot_bloch_vector(coords)  # 2D projection
+    plot_bloch_projections(coords)  # 3 projections (X-Y, X-Z, Y-Z)
+except RuntimeError:
+    print("matplotlib not available")
+
+# Circuit summary and analysis
+summary = circuit_summary(circuit)
+print_circuit_summary(circuit)
+# Output:
+# Circuit Summary
+# ==================================================
+# Qubits: 3
+# Total Gates: 3
+# Estimated Depth: 2
+# T-count: 0
+# Clifford-count: 2
+# Parameters: 1
+# Uses Parametric Gates: True
+#
+# Gate Counts:
+#   CNOT: 1
+#   H: 1
+#   RX: 1
+
+# Compare circuits
+circuit2 = QuantumCircuit(n_qubits=3)
+circuit2.add_gate("H", [0])
+circuit2.add_gate("CNOT", [0, 1])
+comparison = compare_circuits(circuit, circuit2)
+print(f"Same unitary: {comparison['same_unitary']}")
+print(f"Depth difference: {comparison['depth_diff']}")
+```
+
+**Visualization features:**
+- ASCII/text circuit diagrams with gate labels
+- Bloch sphere coordinate computation
+- Circuit summary statistics (depth, gate counts, T-count)
+- Circuit comparison utilities
+- Optional matplotlib integration for plotting
+
 ### Sampling for Measurement Simulation
 
 **Simulate quantum measurements:**
@@ -2598,6 +3132,20 @@ CUDA support is available when PyTorch is installed with CUDA. Simply use `devic
 3. **Leverage batch processing** for training on datasets
 4. **Use CUDA** for large-scale simulations and batch processing
 5. **Consider parameter-shift gradients** for specific use cases where autograd may be inefficient
+
+## Versioning and API Stability
+
+Quantum Conduit follows semantic versioning (SemVer) principles:
+
+- **0.0.x (Beta)**: No API stability guarantees. Breaking changes may occur between patch versions. Use for experimentation and development.
+- **0.x.0 (Minor releases)**: New features and enhancements. Backward compatible within the minor version. API may evolve.
+- **x.0.0 (Major releases)**: Breaking changes allowed. Major API redesigns or incompatible changes.
+
+**Current version**: 0.0.4 (Beta)
+
+**For production use**: We recommend waiting for version 0.1.0 or later for API stability guarantees. The current beta version is suitable for research and development.
+
+**Migration guides**: Will be provided for breaking changes in future releases.
 
 ## Comparison with Alternatives
 

@@ -114,3 +114,4 @@ def diagonal_z_field(
     return PauliSum(terms=terms)
 
 
+

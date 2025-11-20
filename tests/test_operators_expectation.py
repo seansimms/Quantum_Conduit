@@ -232,3 +232,4 @@ class TestExpectationConsistencyWithMatrix:
         assert torch.allclose(exp_expectation, exp_matrix, atol=1e-6)
 
 
+
