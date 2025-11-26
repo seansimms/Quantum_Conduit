@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import math
 import sys
-from typing import IO, List, Optional, Tuple
+from typing import IO, List, Optional
 
 from qconduit.circuit import GateOp, QuantumCircuit
-from qconduit.transpile.analysis import estimate_circuit_depth
 
 
 def _format_angle(theta: float, atol: float = 1e-8) -> str:
@@ -295,7 +294,6 @@ def to_text(
     cols_per_page = max(1, (max_width - 10) // col_width)  # Reserve space for "q0: " prefix
 
     all_lines: List[str] = []
-    current_page_lines: List[str] = None
 
     for page_start in range(0, len(layers), cols_per_page):
         page_end = min(page_start + cols_per_page, len(layers))

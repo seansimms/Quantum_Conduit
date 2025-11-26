@@ -8,9 +8,10 @@ This test module validates:
 5. Normalization diagnostics
 """
 
-import pytest
-import torch
 import math
+
+import torch
+
 import qconduit as qc
 from qconduit.gates.standard import is_unitary
 
@@ -102,7 +103,7 @@ class TestGateUnitarityAndMatrixCorrectness:
         # Test on |00⟩, |01⟩, |10⟩, |11⟩
         basis_states = [
             (0, 0),  # |00⟩ -> |00⟩
-            (1, 0),  # |01⟩ -> |01⟩
+            (1, 1),  # |01⟩ -> |01⟩
             (2, 3),  # |10⟩ -> |11⟩
             (3, 2),  # |11⟩ -> |10⟩
         ]
@@ -143,7 +144,7 @@ class TestStatevectorApplicationSemantics:
         """Test Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2."""
         state = qc.zero_state(n_qubits=2)  # |00⟩
         h_gate = qc.H()
-        state = qc.apply_gate(state, h_gate, qubit=0, n_qubits=2)  # (|00⟩ + |10⟩)/√2
+        state = qc.apply_gate(state, h_gate, qubit=0, n_qubits=2)  # (|00⟩ + |01⟩)/√2
         cnot = qc.CNOT(control_first=True)
         state = qc.apply_two_qubit_gate(state, cnot, qubit1=0, qubit2=1, n_qubits=2)
 
@@ -175,7 +176,10 @@ class TestStatevectorApplicationSemantics:
         state1 = qc.apply_gate(state1, h_gate, qubit=0, n_qubits=1)
 
         # Apply a global phase
-        state2 = state1 * torch.exp(1.0j * math.pi / 4.0)
+        phase = torch.tensor(
+            math.pi / 4.0, dtype=state1.real.dtype, device=state1.device
+        )
+        state2 = state1 * torch.exp(1.0j * phase)
 
         # Probabilities should be the same
         probs1 = qc.measure_probs(state1, n_qubits=1)
@@ -295,7 +299,7 @@ class TestExpectationValues:
 
     def test_expectation_zz_bell_state(self):
         """Test ⟨Z⊗Z⟩ for Bell state using PauliSum."""
-        from qconduit.operators import PauliTerm, PauliSum
+        from qconduit.operators import PauliSum, PauliTerm
         from qconduit.operators.expectation import expectation_pauli_sum
 
         state = qc.zero_state(n_qubits=2)
@@ -304,12 +308,12 @@ class TestExpectationValues:
         cnot = qc.CNOT(control_first=True)
         state = qc.apply_two_qubit_gate(state, cnot, qubit1=0, qubit2=1, n_qubits=2)
 
-        # ⟨Z⊗Z⟩ for Bell state should be -1
+        # ⟨Z⊗Z⟩ for |Φ+⟩ should be +1
         zz_term = PauliTerm(coeff=1.0, paulis=("Z", "Z"))
         hamiltonian = PauliSum.from_terms([zz_term])
         zz_exp = expectation_pauli_sum(state, hamiltonian, n_qubits=2)
 
-        assert torch.allclose(zz_exp, torch.tensor(-1.0), atol=1e-6)
+        assert torch.allclose(zz_exp, torch.tensor(1.0), atol=1e-6)
 
 
 class TestNormalizationDiagnostics:
@@ -381,6 +385,8 @@ class TestNormalizationDiagnostics:
         state = qc.apply_two_qubit_gate(state, cnot, qubit1=0, qubit2=1, n_qubits=2)
         probs = qc.measure_probs(state, n_qubits=2)
         assert torch.allclose(probs.sum(), torch.tensor(1.0), atol=1e-6)
+
+
 
 
 

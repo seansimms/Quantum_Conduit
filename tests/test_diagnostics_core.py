@@ -4,12 +4,12 @@ import pytest
 import torch
 
 from qconduit.diagnostics import (
-    state_norm,
-    assert_normalized,
-    is_hermitian,
     assert_hermitian,
-    fidelity,
+    assert_normalized,
     bloch_vector,
+    fidelity,
+    is_hermitian,
+    state_norm,
 )
 
 
@@ -34,8 +34,9 @@ def test_assert_normalized_raises_for_non_unit_state() -> None:
 def test_state_norm_batched() -> None:
     """Test state_norm on batched states."""
     # Batch of 3 states
+    sqrt_half = 1.0 / torch.sqrt(torch.tensor(2.0))
     states = torch.tensor(
-        [[1.0, 0.0], [0.0, 1.0], [1.0 / torch.sqrt(torch.tensor(2.0)), 1.0 / torch.sqrt(torch.tensor(2.0))]],
+        [[1.0, 0.0], [0.0, 1.0], [sqrt_half, sqrt_half]],
         dtype=torch.complex64,
     )
     norms = state_norm(states)

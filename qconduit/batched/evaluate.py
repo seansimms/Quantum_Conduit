@@ -54,13 +54,13 @@ def evaluate_expectations_batched_via_states(
             f"batched_states.n_qubits={batched_states.n_qubits}"
         )
 
-    B, dim = batched_states.states.shape
+    batch_size, dim = batched_states.states.shape
     device = batched_states.states.device
     dtype = batched_states.states.dtype
 
     # Try vectorized path using dense Hamiltonian matrix
     try:
-        H_dense = paulisum_to_dense(
+        h_dense = paulisum_to_dense(
             hamiltonian,
             num_qubits=batched_states.n_qubits,
             device=device,
@@ -74,18 +74,18 @@ def evaluate_expectations_batched_via_states(
         # Vectorized: (psi.conj() * (H_dense @ psi.T).T).sum(dim=1).real
 
         # Compute H @ psi^T: (dim, dim) @ (dim, B) -> (dim, B)
-        H_psi = H_dense @ batched_states.states.T  # (dim, B)
+        h_times_psi = h_dense @ batched_states.states.T  # (dim, B)
 
         # Compute psi^† @ (H @ psi): element-wise multiply and sum
         # psi.conj(): (B, dim)
         # H_psi.T: (B, dim)
-        expectations = (batched_states.states.conj() * H_psi.T).sum(dim=1).real  # (B,)
+        expectations = (batched_states.states.conj() * h_times_psi.T).sum(dim=1).real
 
         return expectations.to(dtype=torch.float64)
     except Exception:
         # Fallback: loop over batch and use expectation_pauli_sum
         expectations_list = []
-        for i in range(B):
+        for i in range(batch_size):
             state = batched_states.states[i]
             exp_val = expectation_pauli_sum(state, hamiltonian)
             if exp_val.ndim == 0:
@@ -145,12 +145,12 @@ def evaluate_expectations_for_params_batched(
             f"params_batch must be 2D with shape (B, d), got shape {params_batch.shape}"
         )
 
-    B, d = params_batch.shape
+    batch_size, num_params = params_batch.shape
     n_qubits = ansatz.num_qubits
 
-    if d != ansatz.num_parameters:
+    if num_params != ansatz.num_parameters:
         raise ValueError(
-            f"params_batch has d={d} parameters per row, but "
+            f"params_batch has d={num_params} parameters per row, but "
             f"ansatz.num_parameters={ansatz.num_parameters}"
         )
 
@@ -209,4 +209,6 @@ __all__ = [
     "evaluate_expectations_batched_via_states",
     "evaluate_expectations_for_params_batched",
 ]
+
+
 

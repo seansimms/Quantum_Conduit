@@ -7,17 +7,17 @@ import math
 import pytest
 import torch
 
+from qconduit.backend.statevector import apply_gate, zero_state
+from qconduit.circuit import QuantumCircuit
+from qconduit.gates import RX, RZ, H
 from qconduit.transpile import (
+    decompose_gate_to_basis,
     decompose_h_to_rz_rx_rz,
+    decompose_rz_to_clifford_t,
     decompose_x_to_rx,
     decompose_y_to_ry,
     decompose_z_to_rz,
-    decompose_rz_to_clifford_t,
-    decompose_gate_to_basis,
 )
-from qconduit.circuit import QuantumCircuit
-from qconduit.backend.statevector import zero_state, apply_gate
-from qconduit.gates import H, X, Y, Z, RX, RY, RZ, S, T
 
 
 def _compare_states_up_to_global_phase(

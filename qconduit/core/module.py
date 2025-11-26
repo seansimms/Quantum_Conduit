@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import torch
-import torch.nn as nn
 from typing import TYPE_CHECKING
 
-from .device import Device, device as device_factory, default_device
+import torch
+import torch.nn as nn
+
+from .device import Device, default_device
+from .device import device as device_factory
 
 if TYPE_CHECKING:
     pass

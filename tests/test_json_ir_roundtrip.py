@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import math
-import tempfile
 import os
+import tempfile
 
 import pytest
 import torch
@@ -12,11 +12,11 @@ import torch
 from qconduit.circuit import QuantumCircuit
 from qconduit.io import (
     circuit_to_json,
-    json_to_circuit,
     dump_json_circuit,
+    json_circuit_schema,
+    json_to_circuit,
     load_json_circuit,
     validate_json_circuit,
-    json_circuit_schema,
 )
 
 
@@ -200,8 +200,8 @@ class TestSchemaValidation:
 
     def test_invalid_json_file(self):
         """Test that load_json_circuit handles invalid JSON."""
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name

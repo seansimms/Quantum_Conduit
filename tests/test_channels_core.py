@@ -18,8 +18,8 @@ class TestKrausChannelConstruction:
         dtype = torch.complex128
 
         # Identity channel: K_0 = I
-        I = torch.eye(2, dtype=dtype, device=device)
-        channel = KrausChannel(kraus_ops=(I,), n_qubits=1)
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        channel = KrausChannel(kraus_ops=(identity_mat,), n_qubits=1)
         assert channel.n_qubits == 1
         assert len(channel.kraus_ops) == 1
         assert channel.is_cptp()
@@ -69,8 +69,8 @@ class TestApplyToDensity:
         rho0 = density_from_statevector(psi0)
 
         # Identity channel
-        I = torch.eye(2, dtype=dtype, device=device)
-        channel = KrausChannel(kraus_ops=(I,), n_qubits=1)
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        channel = KrausChannel(kraus_ops=(identity_mat,), n_qubits=1)
 
         rho_out = channel.apply_to_density(rho0)
         assert torch.allclose(rho_out, rho0, atol=1e-10)
@@ -129,14 +129,14 @@ class TestComposition:
         device = torch.device("cpu")
         dtype = torch.complex128
 
-        I = torch.eye(2, dtype=dtype, device=device)
-        chan1 = KrausChannel(kraus_ops=(I,), n_qubits=1)
-        chan2 = KrausChannel(kraus_ops=(I,), n_qubits=1)
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        chan1 = KrausChannel(kraus_ops=(identity_mat,), n_qubits=1)
+        chan2 = KrausChannel(kraus_ops=(identity_mat,), n_qubits=1)
 
         composed = chan1.compose(chan2)
         assert composed.n_qubits == 1
         assert len(composed.kraus_ops) == 1
-        assert torch.allclose(composed.kraus_ops[0], I, atol=1e-10)
+        assert torch.allclose(composed.kraus_ops[0], identity_mat, atol=1e-10)
 
     def test_compose_different_channels(self):
         """Test composing different channels."""
@@ -193,8 +193,8 @@ class TestSampleStateAfterChannel:
         device = torch.device("cpu")
         dtype = torch.complex128
 
-        I = torch.eye(2, dtype=dtype, device=device)
-        channel = KrausChannel(kraus_ops=(I,), n_qubits=1)
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        channel = KrausChannel(kraus_ops=(identity_mat,), n_qubits=1)
 
         psi0 = zero_state(n_qubits=1, device=device, dtype=dtype)
 
@@ -265,8 +265,8 @@ class TestSuperoperator:
         dtype = torch.complex128
 
         # Identity channel
-        I = torch.eye(2, dtype=dtype, device=device)
-        channel = KrausChannel(kraus_ops=(I,), n_qubits=1)
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        channel = KrausChannel(kraus_ops=(identity_mat,), n_qubits=1)
 
         # Test on |0⟩ density
         psi0 = zero_state(n_qubits=1, device=device, dtype=dtype)

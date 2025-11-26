@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 import torch
 
-from qconduit.core.device import default_device
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian
 from qconduit.backend.statevector import measure_probs
-from qconduit.algorithms import ising_maxcut_hamiltonian, QAOAAnsatz
-from qconduit.operators import PauliTerm, PauliSum
+from qconduit.core.device import default_device
+from qconduit.operators import PauliSum, PauliTerm
 
 
 def _is_uniform_probabilities(probs: torch.Tensor, tol: float = 0.1) -> bool:
@@ -79,7 +77,6 @@ def test_qaoa_ansatz_rejects_non_diagonal_hamiltonian() -> None:
 def test_qaoa_ansatz_rejects_complex_coefficients() -> None:
     """Test that QAOA ansatz rejects complex coefficients."""
     # Build a Hamiltonian with complex coefficient
-    num_nodes = 2
     # Note: PauliTerm only accepts float coeff, so we'll test via a different path
     # Actually, PauliTerm validates this, so we can't create one with complex coeff
     # But we can test the validation in the ansatz by checking the error message

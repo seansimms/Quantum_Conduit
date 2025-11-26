@@ -42,6 +42,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
+  "numpy>=1.24",
   "torch>=2.1",
 ]
 [project.urls]
@@ -57,6 +58,8 @@ dev = [
     "ruff>=0.1.0",
     "build>=1.0.0",
     "twine>=4.0.0",
+    "mypy>=1.0.0",
+    "types-all>=0.1.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -73,4 +76,16 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["N806"]  # Allow uppercase for physics variables (H, E, etc.)
+"qconduit/gates/standard.py" = ["E743", "N802"]
+"qconduit/channels/builtins.py" = ["N802"]
+"qconduit/backend/statevector.py" = ["E501", "W293", "I001"]
+"qconduit/timeseries/**/*.py" = ["N806", "N803"]  # Allow uppercase for mathematical notation (X, P, Q, etc.)
+"qconduit/features/**/*.py" = ["N803", "N806"]
+"tests/test_features/**/*.py" = ["N803"]
+"examples/**/*.py" = ["N806"]  # Allow uppercase for mathematical notation (H, G, A, etc.)
+"qconduit/rl/**/*.py" = ["N806", "N803", "N802"]  # Allow uppercase for RL notation (Q, G, V, T, etc.)
+"tests/test_rl/**/*.py" = ["N802", "N803"]  # Allow uppercase for test function names and RL notation
+"qconduit/dsp/**/*.py" = ["N806", "N803"]  # Allow uppercase for DSP notation (X, H, Y, S, T, M, worN)
+"qconduit/graphs/**/*.py" = ["N806"]  # Allow uppercase for graph notation (W, D, L)
+"qconduit/probabilistic/**/*.py" = ["N806", "N803"]  # Allow uppercase for probabilistic notation (X, T, L)
 

@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
-from qconduit.transpile import (
-    GateCountSummary,
-    summarize_gate_counts,
-    estimate_circuit_depth,
-)
 from qconduit.circuit import QuantumCircuit
+from qconduit.transpile import (
+    estimate_circuit_depth,
+    summarize_gate_counts,
+)
 
 
 class TestSummarizeGateCounts:

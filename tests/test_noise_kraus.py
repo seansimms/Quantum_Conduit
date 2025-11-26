@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 import torch
 
+from qconduit.core.device import default_device
 from qconduit.noise import (
     KrausChannel,
+    amplitude_damping_channel,
     bit_flip_channel,
-    phase_flip_channel,
     bit_phase_flip_channel,
     depolarizing_channel,
-    phase_damping_channel,
-    amplitude_damping_channel,
     generalized_amplitude_damping_channel,
+    phase_damping_channel,
+    phase_flip_channel,
     two_qubit_depolarizing_channel,
 )
-from qconduit.core.device import default_device
 
 
 def test_bit_flip_channel_construction():
@@ -210,6 +208,8 @@ def test_channel_parameter_validation():
         two_qubit_depolarizing_channel(-0.1)
     with pytest.raises(ValueError):
         two_qubit_depolarizing_channel(1.1)
+
+
 
 
 

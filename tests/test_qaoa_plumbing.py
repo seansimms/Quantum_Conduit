@@ -7,14 +7,15 @@ This test module validates:
 4. Simple QAOA energy checks
 """
 
+import math
+
 import pytest
 import torch
-import math
-import qconduit as qc
-from qconduit.algorithms import ising_maxcut_hamiltonian, QAOAAnsatz
-from qconduit.operators import PauliTerm, PauliSum
+
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian
 from qconduit.algorithms.vqe import VQE
 from qconduit.backend.statevector import measure_probs
+from qconduit.operators import PauliSum, PauliTerm
 
 
 class TestIsingMaxCutHamiltonianConstruction:
@@ -214,6 +215,8 @@ class TestSimpleQAOAEnergyCheck:
         # Minimum energy should be <= 0.5 (random baseline)
         min_energy = min(energies)
         assert min_energy <= 0.5 + 1e-6
+
+
 
 
 

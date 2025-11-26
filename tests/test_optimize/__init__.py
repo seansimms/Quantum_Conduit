@@ -1,0 +1,2 @@
+"""Optimization tests package."""
+

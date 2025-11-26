@@ -33,15 +33,15 @@ def _infer_num_qubits_from_state(state: torch.Tensor) -> int:
     """
     if state.ndim != 1:
         raise ValueError("Statevector must be a 1D tensor.")
-    
+
     dim = state.shape[0]
     if dim <= 0:
         raise ValueError(f"Statevector must have positive length, got {dim}.")
-    
+
     # Check if dim is a power of 2: dim & (dim - 1) == 0 for powers of 2
     if dim & (dim - 1) != 0:
         raise ValueError(f"Statevector length must be a power of 2, got {dim}.")
-    
+
     n_qubits = int(dim).bit_length() - 1
     return n_qubits
 
@@ -82,34 +82,32 @@ def basis_probabilities_from_statevector(
     ValueError
         If state is not 1D, length is not a power of 2, or state has zero norm.
     """
-    n_qubits = _infer_num_qubits_from_state(state)
-    
+    _infer_num_qubits_from_state(state)
+
     # Infer device
     if device is None:
         if state.device.type == "meta":
             device = default_device().as_torch_device()
         else:
             device = state.device
-    else:
-        device = device
-    
+
     # Infer dtype
     if dtype is None:
         dtype = torch.float64
-    
+
     # Cast state to complex dtype on the chosen device
     state_complex = state.to(dtype=torch.complex128, device=device)
-    
+
     # Compute probabilities: |state|^2
     probs = state_complex.abs() ** 2
-    
+
     # Normalize
     total = probs.sum()
     if total == 0:
         raise ValueError("Statevector has zero norm.")
-    
+
     probs = (probs / total).to(device=device, dtype=dtype)
-    
+
     return probs
 
 
@@ -155,45 +153,45 @@ def sample_bitstrings_from_probabilities(
         raise ValueError(f"n_shots must be >= 1, got {n_shots}")
     if probs.ndim != 1:
         raise ValueError(f"probs must be 1D, got shape {probs.shape}")
-    
+
     expected_dim = 1 << num_qubits
     if probs.shape[0] != expected_dim:
         raise ValueError(
             f"probs.shape[0] must be 2**num_qubits = {expected_dim}, "
             f"got {probs.shape[0]}"
         )
-    
+
     # Normalize probabilities defensively
     probs_f = probs.to(dtype=torch.float64)
-    
+
     # Check for negative entries (with tolerance)
     if torch.any(probs_f < -1e-14):
         raise ValueError("Probabilities contain negative values.")
-    
+
     # Clamp to non-negative
     probs_f = torch.clamp(probs_f, min=0.0)
-    
+
     # Normalize
     total = probs_f.sum()
     if total <= 0:
         raise ValueError("Probabilities sum to zero or negative value.")
-    
+
     probs_norm = probs_f / total
-    
+
     # Choose device
     device = probs_norm.device
-    
+
     # Create generator if needed
     if generator is None:
         generator = torch.Generator(device=device)
         generator.manual_seed(0)
-    
+
     # Sample indices using multinomial
     indices = torch.multinomial(
         probs_norm, n_shots, replacement=True, generator=generator
     )
     # indices.shape == (n_shots,)
-    
+
     # Convert integer indices to bitstrings (MSB-first)
     # For index j, we want bitstring [b_0, ..., b_{n-1}] where
     # j = sum_{k=0}^{n-1} b_k * 2**(num_qubits-1-k)
@@ -201,7 +199,7 @@ def sample_bitstrings_from_probabilities(
     bits = torch.zeros((n_shots, num_qubits), dtype=torch.int64, device=device)
     for q in range(num_qubits):
         bits[:, num_qubits - 1 - q] = (indices >> q) & 1
-    
+
     return bits
 
 
@@ -242,15 +240,15 @@ def sample_bitstrings_from_statevector(
         If state is invalid or n_shots < 1.
     """
     n_qubits = _infer_num_qubits_from_state(state)
-    
+
     # Compute probabilities
     probs = basis_probabilities_from_statevector(state)
-    
+
     # Sample bitstrings
     bitstrings = sample_bitstrings_from_probabilities(
         probs, num_qubits=n_qubits, n_shots=n_shots, generator=generator
     )
-    
+
     return bitstrings, probs
 
 
@@ -279,23 +277,22 @@ def bitstring_counts(
     # Validate
     if bitstrings.ndim != 2:
         raise ValueError(f"bitstrings must be 2D, got shape {bitstrings.shape}")
-    
+
     # Check all entries are 0 or 1
     if torch.any((bitstrings != 0) & (bitstrings != 1)):
         raise ValueError("bitstrings must contain only 0 and 1")
-    
+
     n_shots, n_qubits = bitstrings.shape
-    
+
     # Convert each bitstring row to an integer index
     # Row [b_0, ..., b_{n-1}] -> j = sum_{k=0}^{n-1} b_k * 2**(n_qubits-1-k)
     indices = torch.zeros(n_shots, dtype=torch.int64, device=bitstrings.device)
     for q in range(n_qubits):
         indices += bitstrings[:, q].to(dtype=torch.int64) * (1 << (n_qubits - 1 - q))
-    
+
     # Count occurrences
-    max_index = (1 << n_qubits) - 1
     counts = torch.bincount(indices, minlength=1 << n_qubits)
-    
+
     return counts
 
 
@@ -321,11 +318,11 @@ def empirical_probabilities_from_bitstrings(
         If bitstrings is invalid or empty.
     """
     counts = bitstring_counts(bitstrings)
-    
+
     total = counts.sum()
     if total == 0:
         raise ValueError("bitstrings is empty (no samples).")
-    
+
     probs = counts.to(dtype=torch.float64) / total
     return probs
 
@@ -367,35 +364,37 @@ def estimate_pauli_z_expectation_from_samples(
     # Validate
     if bitstrings.ndim != 2:
         raise ValueError(f"bitstrings must be 2D, got shape {bitstrings.shape}")
-    
+
     n_shots, n_qubits = bitstrings.shape
-    
+
     if qubit_index < 0 or qubit_index >= n_qubits:
         raise ValueError(
             f"qubit_index must be in [0, {n_qubits}), got {qubit_index}"
         )
-    
+
     # Extract bits for the given qubit
     bits = bitstrings[:, qubit_index]
-    
+
     # Ensure bits are 0/1
     if torch.any((bits != 0) & (bits != 1)):
         raise ValueError("bitstrings must contain only 0 and 1")
-    
+
     # Map to eigenvalues: 0 -> +1, 1 -> -1
     vals = 1.0 - 2.0 * bits.to(dtype=torch.float64)
-    
+
     # Compute mean
     mean = float(vals.mean())
-    
+
     # Compute standard error
     if n_shots < 2:
         stderr = 0.0
     else:
         var = float(vals.var(unbiased=True))
         stderr = math.sqrt(var / n_shots)
-    
+
     return mean, stderr
+
+
 
 
 

@@ -88,18 +88,15 @@ def _apply_pauli_term_evolution(
     for q in non_identity_qubits:
         label = paulis[q].upper()
         if label == "X":
-            # H maps X to Z
-            H = stdgates.H(dtype=dtype, device=torch_device)
-            state = apply_gate(state, H, qubit=q, n_qubits=n_qubits)
+            hadamard_gate = stdgates.H(dtype=dtype, device=torch_device)
+            state = apply_gate(state, hadamard_gate, qubit=q, n_qubits=n_qubits)
             basis_change.append((q, "X"))
         elif label == "Y":
-            # S† then H maps Y to Z
-            # Implement S† as S^-1 = diag(1, -i).
-            S = stdgates.S(dtype=dtype, device=torch_device)
-            S_dag = S.conj().transpose(-2, -1)
-            state = apply_gate(state, S_dag, qubit=q, n_qubits=n_qubits)
-            H = stdgates.H(dtype=dtype, device=torch_device)
-            state = apply_gate(state, H, qubit=q, n_qubits=n_qubits)
+            phase_gate = stdgates.S(dtype=dtype, device=torch_device)
+            phase_dag = phase_gate.conj().transpose(-2, -1)
+            state = apply_gate(state, phase_dag, qubit=q, n_qubits=n_qubits)
+            hadamard_gate = stdgates.H(dtype=dtype, device=torch_device)
+            state = apply_gate(state, hadamard_gate, qubit=q, n_qubits=n_qubits)
             basis_change.append((q, "Y"))
         elif label == "Z":
             basis_change.append((q, "Z"))
@@ -166,15 +163,13 @@ def _apply_pauli_term_evolution(
     # Undo basis changes (reverse order)
     for q, label in reversed(basis_change):
         if label == "X":
-            # Undo H
-            H = stdgates.H(dtype=dtype, device=torch_device)
-            state = apply_gate(state, H, qubit=q, n_qubits=n_qubits)
+            hadamard_gate = stdgates.H(dtype=dtype, device=torch_device)
+            state = apply_gate(state, hadamard_gate, qubit=q, n_qubits=n_qubits)
         elif label == "Y":
-            # Undo H then S† -> i.e., H then S
-            H = stdgates.H(dtype=dtype, device=torch_device)
-            state = apply_gate(state, H, qubit=q, n_qubits=n_qubits)
-            S = stdgates.S(dtype=dtype, device=torch_device)
-            state = apply_gate(state, S, qubit=q, n_qubits=n_qubits)
+            hadamard_gate = stdgates.H(dtype=dtype, device=torch_device)
+            state = apply_gate(state, hadamard_gate, qubit=q, n_qubits=n_qubits)
+            phase_gate = stdgates.S(dtype=dtype, device=torch_device)
+            state = apply_gate(state, phase_gate, qubit=q, n_qubits=n_qubits)
         # Z and I require no basis change undo
 
     if is_debug_enabled():

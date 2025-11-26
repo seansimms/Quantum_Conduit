@@ -4,18 +4,17 @@ from __future__ import annotations
 
 import torch
 
-from qconduit.backend.statevector import zero_state
-from qconduit.gates import standard as stdgates
-from qconduit.backend.statevector import apply_gate
-from qconduit.core.device import default_device
-from qconduit.sampling import (
-    sample_from_probs,
-    sample_bitstrings_state,
-    sample_bitstrings_dm,
-    sample_bitstrings_circuit,
-)
 from qconduit.backend.density_matrix import dm_from_statevector
+from qconduit.backend.statevector import apply_gate, zero_state
 from qconduit.circuit import QuantumCircuit
+from qconduit.core.device import default_device
+from qconduit.gates import standard as stdgates
+from qconduit.sampling import (
+    sample_bitstrings_circuit,
+    sample_bitstrings_dm,
+    sample_bitstrings_state,
+    sample_from_probs,
+)
 
 
 def test_sample_from_probs_deterministic() -> None:
@@ -100,21 +99,19 @@ def test_sample_bitstrings_circuit_bell_state() -> None:
     assert samples.shape == (shots, 2)
 
     # Compute empirical frequencies
-    # The circuit produces p(00)=0.5, p(01)=0.5
-    # Bitstring representation uses [q0, q1] ordering, so:
-    # - Index 0 = |00> (in |q1 q0> notation) -> [0, 0] (in [q0, q1] notation)
-    # - Index 1 = |01> (in |q1 q0> notation) -> [1, 0] (in [q0, q1] notation)
+    # The circuit prepares |Φ+⟩ = (|00⟩ + |11⟩)/√2 in little-endian ordering,
+    # which corresponds to bitstrings [0, 0] and [1, 1].
     zeros_zero = (
         (samples[:, 0] == 0).logical_and(samples[:, 1] == 0).sum().item()
     )
-    one_zero = (
-        (samples[:, 0] == 1).logical_and(samples[:, 1] == 0).sum().item()
+    ones_one = (
+        (samples[:, 0] == 1).logical_and(samples[:, 1] == 1).sum().item()
     )
 
-    # Should be roughly 50/50 split between [0,0] and [1,0]
-    assert abs(zeros_zero - one_zero) < shots * 0.2
-    # Most outcomes should be [0,0] or [1,0]
-    assert (zeros_zero + one_zero) > shots * 0.9
+    # Should be roughly 50/50 split between [0,0] and [1,1]
+    assert abs(zeros_zero - ones_one) < shots * 0.2
+    # Most outcomes should be [0,0] or [1,1]
+    assert (zeros_zero + ones_one) > shots * 0.9
 
 
 def test_sample_from_probs_qubit_subset() -> None:

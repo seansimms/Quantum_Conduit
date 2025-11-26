@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import torch
 
-from qconduit.backend.statevector import zero_state, apply_gate, apply_two_qubit_gate
+from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate, zero_state
 from qconduit.circuit import QuantumCircuit
 from qconduit.core.device import Device, default_device
 from qconduit.exact import paulisum_to_dense
@@ -278,13 +278,13 @@ def _build_statevector_autograd(
     This is a fallback that works for specific ansatz types by building
     the statevector directly rather than going through circuit building.
     """
+    from qconduit.gates.standard import CNOT, RX, RY, RZ, H
+    from qconduit.time_evolution.core import trotter_step_pauli_sum
     from qconduit.variational.ansatz import (
         HardwareEfficientAnsatz,
         LayeredEntanglerAnsatz,
         QAOAAnsatz,
     )
-    from qconduit.gates.standard import RX, RY, RZ, H, CNOT
-    from qconduit.time_evolution.core import trotter_step_pauli_sum
 
     n_qubits = ansatz.num_qubits
     qdevice = Device(
@@ -411,7 +411,7 @@ def _vqe_energy_autograd(
     final_state = _build_statevector_autograd(ansatz, params, device)
 
     # Compute expectation via dense matrix (preserves gradients)
-    H_dense = paulisum_to_dense(
+    h_dense = paulisum_to_dense(
         hamiltonian,
         num_qubits=n_qubits,
         device=device,
@@ -420,7 +420,7 @@ def _vqe_energy_autograd(
 
     # ⟨ψ|H|ψ⟩ = ψ† H ψ
     psi = final_state
-    value = (psi.conj().unsqueeze(0) @ (H_dense @ psi.unsqueeze(1))).squeeze()
+    value = (psi.conj().unsqueeze(0) @ (h_dense @ psi.unsqueeze(1))).squeeze()
 
     # Return real part as scalar
     return value.real

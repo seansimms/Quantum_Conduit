@@ -38,33 +38,33 @@ class SingleQubitChannel:
             raise ValueError("kraus_operators must be non-empty")
 
         # Validate all operators are 2x2 complex tensors
-        for i, K in enumerate(self.kraus_operators):
-            if not isinstance(K, torch.Tensor):
+        for i, kraus_op in enumerate(self.kraus_operators):
+            if not isinstance(kraus_op, torch.Tensor):
                 raise ValueError(f"Kraus operator {i} must be a torch.Tensor")
-            if K.shape != (2, 2):
+            if kraus_op.shape != (2, 2):
                 raise ValueError(
-                    f"Kraus operator {i} must have shape (2, 2), got {K.shape}"
+                    f"Kraus operator {i} must have shape (2, 2), got {kraus_op.shape}"
                 )
-            if not torch.is_complex(K):
+            if not torch.is_complex(kraus_op):
                 raise ValueError(
-                    f"Kraus operator {i} must be complex dtype, got {K.dtype}"
+                    f"Kraus operator {i} must be complex dtype, got {kraus_op.dtype}"
                 )
 
         # Check trace-preserving condition: sum_i K_i^\dagger K_i = I
         # Get dtype and device from first operator
         dtype = self.kraus_operators[0].dtype
         device = self.kraus_operators[0].device
-        I_ref = torch.eye(2, dtype=dtype, device=device)
+        identity_ref = torch.eye(2, dtype=dtype, device=device)
 
         sum_kdag_k = torch.zeros((2, 2), dtype=dtype, device=device)
-        for K in self.kraus_operators:
+        for kraus_op in self.kraus_operators:
             # Ensure same dtype and device
-            K = K.to(dtype=dtype, device=device)
-            Kdag = K.conj().transpose(-2, -1)
-            sum_kdag_k = sum_kdag_k + Kdag @ K
+            normalized = kraus_op.to(dtype=dtype, device=device)
+            k_dag = normalized.conj().transpose(-2, -1)
+            sum_kdag_k = sum_kdag_k + k_dag @ normalized
 
         # Check if sum_kdag_k ≈ I within tolerance
-        diff = torch.abs(sum_kdag_k - I_ref)
+        diff = torch.abs(sum_kdag_k - identity_ref)
         max_diff = torch.max(diff).item()
         if max_diff > 1e-6:
             raise ValueError(

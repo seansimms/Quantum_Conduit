@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import math
-
 import torch
 
+from qconduit.algorithms.vqe import VQE
 from qconduit.grad import param_shift_energy
 from qconduit.layers.ansatzes import HardwareEfficientAnsatz
-from qconduit.operators.pauli import PauliTerm, PauliSum
-from qconduit.algorithms.vqe import VQE
+from qconduit.operators.pauli import PauliSum, PauliTerm
 
 
 def finite_diff(
@@ -148,6 +146,8 @@ def test_param_shift_multiple_parameters():
     # Verify all gradients are computed (not all zeros, unless truly zero)
     # At least some should be non-zero for this setup
     assert torch.any(torch.abs(grad_ps) > 1e-6)
+
+
 
 
 

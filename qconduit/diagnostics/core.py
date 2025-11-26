@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 import torch
 
 
@@ -233,6 +231,8 @@ def bloch_vector(state: torch.Tensor) -> torch.Tensor:
     z = (a.abs() ** 2) - (b.abs() ** 2)
 
     return torch.stack([x, y, z], dim=-1)
+
+
 
 
 

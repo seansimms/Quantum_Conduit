@@ -6,8 +6,8 @@ from typing import Optional, Sequence, Tuple
 
 import torch
 
-from qconduit.backend.statevector import measure_probs
 from qconduit.backend.density_matrix import measure_probs_dm
+from qconduit.backend.statevector import measure_probs
 from qconduit.circuit import QuantumCircuit
 from qconduit.core.device import Device, default_device
 
@@ -280,6 +280,8 @@ def sample_bitstrings_circuit(
     )
     # For a non-batched state, samples will have shape (n_shots, len(qubits))
     return samples
+
+
 
 
 

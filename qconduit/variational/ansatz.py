@@ -240,7 +240,10 @@ class QAOAAnsatz:
             raise ValueError(f"num_qubits must be >= 1, got {self.num_qubits}")
         if self.depth < 1:
             raise ValueError(f"depth must be >= 1, got {self.depth}")
-        if self.cost_hamiltonian.n_qubits() != 0 and self.cost_hamiltonian.n_qubits() != self.num_qubits:
+        if (
+            self.cost_hamiltonian.n_qubits() != 0
+            and self.cost_hamiltonian.n_qubits() != self.num_qubits
+        ):
             raise ValueError(
                 f"cost_hamiltonian.n_qubits() = {self.cost_hamiltonian.n_qubits()} "
                 f"does not match num_qubits = {self.num_qubits}"
@@ -323,6 +326,8 @@ __all__ = [
     "LayeredEntanglerAnsatz",
     "QAOAAnsatz",
 ]
+
+
 
 
 

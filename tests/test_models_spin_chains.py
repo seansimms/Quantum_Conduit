@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from qconduit.exact import exact_eigensystem, paulisum_to_dense
+from qconduit.exact import exact_eigensystem
 from qconduit.models import (
     heisenberg_xxz_chain,
     ising_zz_chain,

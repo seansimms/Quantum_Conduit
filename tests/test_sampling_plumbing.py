@@ -9,23 +9,24 @@ This test module validates:
 6. Reproducibility
 """
 
-import pytest
-import torch
 import math
+
+import torch
+
 import qconduit as qc
+from qconduit.backend.density_matrix import dm_from_statevector
+from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate
+from qconduit.circuit import QuantumCircuit
 from qconduit.sampling import (
-    sample_from_probs,
-    sample_bitstrings_state,
-    sample_bitstrings_dm,
-    sample_bitstrings_circuit,
     bitstring_counts,
     counts_to_probs,
     kl_divergence,
     marginalize_probs,
+    sample_bitstrings_circuit,
+    sample_bitstrings_dm,
+    sample_bitstrings_state,
+    sample_from_probs,
 )
-from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate
-from qconduit.backend.density_matrix import dm_from_statevector
-from qconduit.circuit import QuantumCircuit
 
 
 class TestDeterministicSampling:
@@ -178,7 +179,9 @@ class TestCircuitBasedSampling:
         state = circuit.simulate_state()
         generator2 = torch.Generator()
         generator2.manual_seed(42)
-        samples_state = sample_bitstrings_state(state, n_qubits=1, n_shots=1000, generator=generator2)
+        samples_state = sample_bitstrings_state(
+            state, n_qubits=1, n_shots=1000, generator=generator2
+        )
 
         # Should produce same samples with same seed
         assert torch.allclose(samples_circuit, samples_state)
@@ -316,6 +319,8 @@ class TestReproducibility:
         samples2 = sample_bitstrings_circuit(circuit, n_shots=50, generator=generator2)
 
         assert torch.allclose(samples1, samples2)
+
+
 
 
 

@@ -6,17 +6,17 @@ This module provides:
 - Circuit summary and comparison utilities
 """
 
-from .drawer import to_text, print_circuit
 from .bloch import (
-    bloch_coords_from_statevector,
     bloch_coords_from_density,
-    plot_bloch_vector,
+    bloch_coords_from_statevector,
     plot_bloch_projections,
+    plot_bloch_vector,
 )
+from .drawer import print_circuit, to_text
 from .summary import (
     circuit_summary,
-    print_circuit_summary,
     compare_circuits,
+    print_circuit_summary,
 )
 
 __all__ = [
@@ -30,4 +30,6 @@ __all__ = [
     "print_circuit_summary",
     "compare_circuits",
 ]
+
+
 

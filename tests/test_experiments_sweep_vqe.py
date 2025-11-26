@@ -8,9 +8,9 @@ import pytest
 import torch
 
 from qconduit.algorithms.vqe import VQE
+from qconduit.experiments import sweep_vqe_1d, sweep_vqe_2d
 from qconduit.layers.ansatzes import HardwareEfficientAnsatz
 from qconduit.operators import PauliSum, PauliTerm
-from qconduit.experiments import sweep_vqe_1d, sweep_vqe_2d
 
 
 def build_single_qubit_vqe() -> tuple[VQE, torch.Tensor]:

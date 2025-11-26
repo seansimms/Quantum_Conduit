@@ -6,17 +6,18 @@ This test module validates:
 3. Sweeps + VQE + QAOA integration
 """
 
-import pytest
-import torch
 import math
+
+import torch
+
 import qconduit as qc
-from qconduit.algorithms import ising_maxcut_hamiltonian, QAOAAnsatz
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian
 from qconduit.algorithms.vqe import VQE
-from qconduit.operators import PauliTerm, PauliSum
-from qconduit.operators.expectation import expectation_pauli_sum
-from qconduit.sampling import sample_bitstrings_circuit, bitstring_counts
-from qconduit.time_evolution import time_evolve_state, build_trotter_circuit
 from qconduit.experiments import sweep_vqe_1d, sweep_vqe_2d
+from qconduit.operators import PauliSum, PauliTerm
+from qconduit.operators.expectation import expectation_pauli_sum
+from qconduit.sampling import bitstring_counts, sample_bitstrings_circuit
+from qconduit.time_evolution import build_trotter_circuit, time_evolve_state
 
 
 class TestMaxCutQAOAVQESampling:
@@ -53,11 +54,11 @@ class TestMaxCutQAOAVQESampling:
         n_shots = 10000
         samples = sample_bitstrings_circuit(circuit, n_shots=n_shots, generator=generator)
 
-        # Compute empirical energy from samples
-        # For each bitstring, compute its cut value
-        # H = sum_{(i,j) in E} w_ij * (1 - Z_i Z_j) / 2
-        # For unweighted graph, w_ij = 1
-        # Cut value for bitstring b: sum_{(i,j) in E} (1 - (-1)^{b_i + b_j}) / 2
+        # Compute empirical energy from samples.
+        # Each MaxCut Pauli term contributes (1 - Z_i Z_j)/2, which evaluates to 1
+        # when the edge is cut and 0 otherwise. Because the Hamiltonian already
+        # includes the constant w_ij / 2 contribution internally, we only need to
+        # accumulate the cut counts here—no extra constant offset is added.
         counts = bitstring_counts(samples)
         empirical_energy = 0.0
         total_count = sum(counts.values())
@@ -70,8 +71,7 @@ class TestMaxCutQAOAVQESampling:
                 # If bits[i] != bits[j], edge is cut
                 if bits[i] != bits[j]:
                     cut_value += 1.0
-            # Add constant term (sum w_ij / 2 = 3/2 = 1.5)
-            energy_for_bitstring = cut_value + 1.5
+            energy_for_bitstring = cut_value
             empirical_energy += (count / total_count) * energy_for_bitstring
 
         # All three estimates should agree within tolerances
@@ -136,9 +136,17 @@ class TestTimeEvolutionMeasurementSampling:
         # Combine circuits
         full_circuit = qc.QuantumCircuit(n_qubits=n_qubits)
         for op in prep_circuit.ops:
-            full_circuit.add_gate(op.name, list(op.qubits), params=list(op.params) if op.params else None)
+            full_circuit.add_gate(
+                op.name,
+                list(op.qubits),
+                params=list(op.params) if op.params else None,
+            )
         for op in circuit.ops:
-            full_circuit.add_gate(op.name, list(op.qubits), params=list(op.params) if op.params else None)
+            full_circuit.add_gate(
+                op.name,
+                list(op.qubits),
+                params=list(op.params) if op.params else None,
+            )
 
         evolved_circuit_state = full_circuit.simulate_state(device=dev, dtype=dtype)
         zz_exp_circuit = expectation_pauli_sum(evolved_circuit_state, zz_H, n_qubits=n_qubits)
@@ -256,6 +264,8 @@ class TestSweepsVQEOAOA:
         assert result_2d.x_points.dtype in [torch.float32, torch.float64]
         assert result_2d.y_points.dtype in [torch.float32, torch.float64]
         assert result_2d.values.dtype in [torch.float32, torch.float64]
+
+
 
 
 

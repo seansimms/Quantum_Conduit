@@ -4,7 +4,20 @@ __version__ = "0.0.4"
 
 # Core abstractions
 # Algorithms
-from .algorithms import Edge, ising_maxcut_hamiltonian, QAOAAnsatz, VQE
+# Adiabatic evolution
+from .adiabatic import (
+    AdiabaticConfig,
+    ScheduleFn,
+    adiabatic_evolve_state,
+    adiabatic_x_mixer_to_problem_state,
+    build_adiabatic_circuit,
+    build_x_mixer_hamiltonian,
+    interpolate_paulisum,
+    linear_schedule,
+    polynomial_schedule,
+    sample_schedule,
+)
+from .algorithms import VQE, Edge, QAOAAnsatz, ising_maxcut_hamiltonian
 
 # Backend operations
 from .backend import (
@@ -22,6 +35,21 @@ from .backend import (
 
 # Circuit IR
 from .circuit import GateOp, QuantumCircuit
+
+# Convex optimization (G26: Convex Optimization Textbook Library)
+from .convex import (
+    LPProblem,
+    OptimizeResult,
+    QPProblem,
+    Status,
+    active_set_qp,
+    is_kkt_optimal,
+    kkt_residuals,
+    log_barrier_method,
+    projected_gradient,
+    projected_newton,
+    simplex,
+)
 from .core import Device, QuantumModule, default_device, device
 
 # Diagnostics
@@ -35,6 +63,83 @@ from .diagnostics import (
     is_hermitian,
     set_debug_enabled,
     state_norm,
+)
+
+# Deterministic Signal Processing (G30: Deterministic Signal Processing Suite)
+from .dsp import (
+    STFT,
+    apply_fir,
+    blackman,
+    butterworth,
+    cheby1,
+    check_1d_array,
+    convolve,
+    correlate,
+    design_frequency_grid,
+    fft_convolve,
+    filtfilt,
+    fir_window_design,
+    freqz,
+    hamming,
+    hann,
+    istft,
+    lfilter,
+    next_pow2,
+    overlap_add_filter,
+    overlap_save_filter,
+    rectangular,
+    sosfilt,
+    sosfiltfilt,
+    spectrogram,
+    stft,
+    tf2sos,
+)
+
+# Evolution (G15: Hamiltonian Time Evolution & Trotterization)
+from .evolution import (
+    TrotterOrder,
+    TrotterSchedule,
+    evolve_state_trotter,
+    exact_time_evolution_statevector,
+)
+
+# Exact solvers
+from .exact import (
+    exact_eigensystem,
+    exact_ground_state,
+    paulisum_to_dense,
+)
+
+# Experiments
+from .experiments import (
+    SweepResult1D,
+    SweepResult2D,
+    run_1d_sweep,
+    run_2d_sweep,
+    sweep_vqe_1d,
+    sweep_vqe_2d,
+)
+
+# Feature engineering transforms (G25)
+from .features import (
+    PCA,
+    KBinsDiscretizer,
+    MinMaxScaler,
+    OneHotEncoder,
+    PolynomialFeatures,
+    RobustScaler,
+    StandardScaler,
+    TargetEncoder,
+    Transformer,
+)
+
+# Fermion-to-qubit mappings
+from .fermion import (
+    FermionOperator,
+    FermionOpSymbol,
+    FermionTerm,
+    bravyi_kitaev,
+    jordan_wigner,
 )
 
 # Gates
@@ -63,34 +168,79 @@ from .grad import (
     vqe_parameter_shift_gradient,
 )
 
+# Graph algorithms (G27: Graph Algorithms Textbook Classics)
+from .graphs import (
+    Graph,
+    WeightedGraph,
+    bellman_ford,
+    bfs,
+    dfs_iterative,
+    dfs_recursive,
+    dijkstra,
+    edges_from_weighted_graph,
+    floyd_warshall,
+    graph_laplacian_matrix,
+    kruskal_mst,
+    node_index_map,
+    pagerank,
+    prim_mst,
+    reconstruct_path,
+    spectral_clustering,
+)
+
 # Layers
 from .layers import HardwareEfficientAnsatz, ParametricAnsatz, QuantumBlock
+
+# Measurement, sampling, and tomography
+from .measurement import (
+    basis_probabilities_from_statevector,
+    bitstring_counts,
+    empirical_probabilities_from_bitstrings,
+    estimate_pauli_z_expectation_from_samples,
+    pauli_expectation_from_statevector,
+    pauli_matrix_from_label,
+    reconstruct_single_qubit_density_from_pauli,
+    reconstruct_two_qubit_density_from_pauli,
+    sample_bitstrings_from_probabilities,
+    sample_bitstrings_from_statevector,
+    single_qubit_pauli_expectations_from_statevector,
+    two_qubit_pauli_expectations_from_statevector,
+)
+
+# Models
+from .models import (
+    diagonal_z_field,
+    heisenberg_xxz_chain,
+    ising_zz_chain,
+    transverse_field_ising_chain,
+    two_qubit_generic_chemistry_like,
+)
 
 # Noise models
 from .noise import (
     AmplitudeDampingChannel,
     DepolarizingChannel,
+    # New G11 APIs
+    KrausChannel,
+    NoiseConfig,
     NoiseModel,
     PhaseDampingChannel,
     SingleQubitChannel,
-    depolarizing_channel,
-    phase_damping_channel,
     amplitude_damping_channel,
-    identity_channel,
-    NoiseConfig,
-    simulate_noisy_circuit_dm,
-    sample_noisy_circuit_dm,
-    # New G11 APIs
-    KrausChannel,
-    bit_flip_channel,
-    phase_flip_channel,
-    bit_phase_flip_channel,
-    generalized_amplitude_damping_channel,
-    two_qubit_depolarizing_channel,
-    to_density_matrix,
     apply_kraus_channel_to_density_matrix,
     apply_kraus_channel_to_statevector,
+    bit_flip_channel,
+    bit_phase_flip_channel,
     compose_kraus_channels,
+    depolarizing_channel,
+    generalized_amplitude_damping_channel,
+    identity_channel,
+    phase_damping_channel,
+    phase_flip_channel,
+    sample_noisy_circuit_dm,
+    simulate_noisy_circuit_dm,
+    to_density_matrix,
+    two_qubit_depolarizing_channel,
 )
 
 # Operators
@@ -105,18 +255,46 @@ from .operators import (
 # Optimizers
 from .optim import OptimConfig, create_optimizer
 
-# Training
-from .training import (
-    EarlyStoppingConfig,
-    TrainingCallback,
-    TrainingHistory,
-    TrainingStepInfo,
-    VQETrainer,
+# Probabilistic inference (G28: Textbook Probabilistic Inference Tools)
+from .probabilistic import (
+    GaussianMixture,
+    HiddenMarkovModel,
+    StateSpaceModel,
+    bootstrap_particle_filter,
+    effective_sample_size,
+    log_normal_pdf,
+    logsumexp,
+    normal_pdf,
+    normalize_log_weights,
+    systematic_resample,
+)
+
+# Reinforcement Learning (G29: Classic Reinforcement Learning Algorithms)
+from .rl import (
+    Bandit,
+    ChainMDP,
+    Env,
+    GridWorldTiny,
+    Policy,
+    TabularAgent,
+    TabularPolicy,
+    compute_advantage,
+    discounted_returns,
+    epsilon_greedy_action,
+    evaluate_policy,
+    greedy_policy_from_Q,
+    mc_control_on_policy,
+    q_learning,
+    reinforce,
+    reinforce_with_baseline,
+    sarsa,
+    seed_rng,
+    softmax,
+    td_lambda,
 )
 
 # Sampling
 from .sampling import (
-    bitstring_counts,
     counts_to_probs,
     kl_divergence,
     marginalize_probs,
@@ -129,112 +307,60 @@ from .sampling import (
 # Time evolution
 from .time_evolution import (
     OrderLiteral,
-    trotter_step_pauli_sum,
-    time_evolve_state,
-    build_trotter_step_circuit,
     build_trotter_circuit,
+    build_trotter_step_circuit,
+    time_evolve_state,
+    trotter_step_pauli_sum,
 )
 
-# Evolution (G15: Hamiltonian Time Evolution & Trotterization)
-from .evolution import (
-    exact_time_evolution_statevector,
-    TrotterOrder,
-    TrotterSchedule,
-    evolve_state_trotter,
+# Time-series forecasting (G24: Textbook Time-Series Forecasting Models)
+from .timeseries import (
+    AR,
+    ARIMA,
+    ARMA,
+    MA,
+    SARIMA,
+    FitResult,
+    StateSpace,
+    kalman_filter,
+    kalman_predict,
+    kalman_smoother,
 )
 
-# Experiments
-from .experiments import (
-    SweepResult1D,
-    SweepResult2D,
-    run_1d_sweep,
-    run_2d_sweep,
-    sweep_vqe_1d,
-    sweep_vqe_2d,
-)
-
-# Exact solvers
-from .exact import (
-    paulisum_to_dense,
-    exact_eigensystem,
-    exact_ground_state,
-)
-
-# Models
-from .models import (
-    transverse_field_ising_chain,
-    heisenberg_xxz_chain,
-    ising_zz_chain,
-    two_qubit_generic_chemistry_like,
-    diagonal_z_field,
-)
-
-# Adiabatic evolution
-from .adiabatic import (
-    ScheduleFn,
-    linear_schedule,
-    polynomial_schedule,
-    sample_schedule,
-    AdiabaticConfig,
-    interpolate_paulisum,
-    adiabatic_evolve_state,
-    build_adiabatic_circuit,
-    build_x_mixer_hamiltonian,
-    adiabatic_x_mixer_to_problem_state,
-)
-
-# Fermion-to-qubit mappings
-from .fermion import (
-    FermionOpSymbol,
-    FermionTerm,
-    FermionOperator,
-    jordan_wigner,
-    bravyi_kitaev,
-)
-
-# Measurement, sampling, and tomography
-from .measurement import (
-    basis_probabilities_from_statevector,
-    sample_bitstrings_from_probabilities,
-    sample_bitstrings_from_statevector,
-    bitstring_counts,
-    empirical_probabilities_from_bitstrings,
-    estimate_pauli_z_expectation_from_samples,
-    pauli_matrix_from_label,
-    pauli_expectation_from_statevector,
-    single_qubit_pauli_expectations_from_statevector,
-    reconstruct_single_qubit_density_from_pauli,
-    two_qubit_pauli_expectations_from_statevector,
-    reconstruct_two_qubit_density_from_pauli,
-)
-
-# Variational algorithms
-from .variational import (
-    VariationalAnsatz,
-    HardwareEfficientAnsatz,
-    LayeredEntanglerAnsatz,
-    QAOAAnsatz,
-    VQEResult,
-    evaluate_expectation_value,
-    run_vqe,
-    QAOAResult,
-    run_qaoa,
+# Training
+from .training import (
+    EarlyStoppingConfig,
+    TrainingCallback,
+    TrainingHistory,
+    TrainingStepInfo,
+    VQETrainer,
 )
 
 # Transpilation and decomposition
 from .transpile import (
+    GateCountSummary,
+    decompose_gate_to_basis,
     decompose_h_to_rz_rx_rz,
+    decompose_rz_to_clifford_t,
     decompose_x_to_rx,
     decompose_y_to_ry,
     decompose_z_to_rz,
-    decompose_rz_to_clifford_t,
-    decompose_gate_to_basis,
-    transpile_to_basis,
-    transpile_to_rx_rz_cx_basis,
-    transpile_to_clifford_t,
-    GateCountSummary,
-    summarize_gate_counts,
     estimate_circuit_depth,
+    summarize_gate_counts,
+    transpile_to_basis,
+    transpile_to_clifford_t,
+    transpile_to_rx_rz_cx_basis,
+)
+
+# Variational algorithms
+from .variational import (
+    LayeredEntanglerAnsatz,
+    QAOAResult,
+    VariationalAnsatz,
+    VQEResult,
+    evaluate_expectation_value,
+    run_qaoa,
+    run_vqe,
 )
 
 __all__ = [
@@ -391,6 +517,16 @@ __all__ = [
     "FermionOperator",
     "jordan_wigner",
     "bravyi_kitaev",
+    # Feature engineering
+    "Transformer",
+    "StandardScaler",
+    "RobustScaler",
+    "MinMaxScaler",
+    "PCA",
+    "PolynomialFeatures",
+    "OneHotEncoder",
+    "TargetEncoder",
+    "KBinsDiscretizer",
     # Measurement, sampling, and tomography
     "basis_probabilities_from_statevector",
     "sample_bitstrings_from_probabilities",
@@ -428,4 +564,103 @@ __all__ = [
     "GateCountSummary",
     "summarize_gate_counts",
     "estimate_circuit_depth",
+    # Time-series models (G24)
+    "AR",
+    "MA",
+    "ARMA",
+    "ARIMA",
+    "SARIMA",
+    "FitResult",
+    "StateSpace",
+    "kalman_filter",
+    "kalman_smoother",
+    "kalman_predict",
+    # Convex optimization (G26)
+    "Status",
+    "OptimizeResult",
+    "LPProblem",
+    "QPProblem",
+    "simplex",
+    "active_set_qp",
+    "log_barrier_method",
+    "projected_gradient",
+    "projected_newton",
+    "kkt_residuals",
+    "is_kkt_optimal",
+    # Graph algorithms (G27)
+    "Graph",
+    "WeightedGraph",
+    "bfs",
+    "dfs_recursive",
+    "dfs_iterative",
+    "dijkstra",
+    "bellman_ford",
+    "floyd_warshall",
+    "kruskal_mst",
+    "prim_mst",
+    "pagerank",
+    "graph_laplacian_matrix",
+    "spectral_clustering",
+    "node_index_map",
+    "edges_from_weighted_graph",
+    "reconstruct_path",
+    # Probabilistic inference (G28)
+    "HiddenMarkovModel",
+    "GaussianMixture",
+    "StateSpaceModel",
+    "bootstrap_particle_filter",
+    "logsumexp",
+    "normal_pdf",
+    "log_normal_pdf",
+    "systematic_resample",
+    "effective_sample_size",
+    "normalize_log_weights",
+    # Reinforcement Learning (G29)
+    "Env",
+    "ChainMDP",
+    "GridWorldTiny",
+    "Bandit",
+    "TabularAgent",
+    "Policy",
+    "TabularPolicy",
+    "mc_control_on_policy",
+    "q_learning",
+    "sarsa",
+    "td_lambda",
+    "reinforce",
+    "reinforce_with_baseline",
+    "seed_rng",
+    "epsilon_greedy_action",
+    "softmax",
+    "discounted_returns",
+    "compute_advantage",
+    "evaluate_policy",
+    "greedy_policy_from_Q",
+    # Deterministic Signal Processing (G30)
+    "STFT",
+    "check_1d_array",
+    "next_pow2",
+    "freqz",
+    "design_frequency_grid",
+    "hann",
+    "hamming",
+    "blackman",
+    "rectangular",
+    "convolve",
+    "correlate",
+    "fft_convolve",
+    "overlap_add_filter",
+    "overlap_save_filter",
+    "stft",
+    "istft",
+    "spectrogram",
+    "fir_window_design",
+    "apply_fir",
+    "butterworth",
+    "cheby1",
+    "tf2sos",
+    "sosfilt",
+    "lfilter",
+    "filtfilt",
+    "sosfiltfilt",
 ]

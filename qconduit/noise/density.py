@@ -144,11 +144,10 @@ def apply_kraus_channel_to_density_matrix(
 
     # Apply channel: ρ' = ∑_i K_i ρ K_i†
     rho_out = torch.zeros_like(rho)
-    for K in channel.kraus_ops:
-        # K @ rho @ K.conj().T
-        K_rho = K @ rho
-        K_rho_Kdag = K_rho @ K.conj().T
-        rho_out = rho_out + K_rho_Kdag
+    for kraus_op in channel.kraus_ops:
+        kraus_rho = kraus_op @ rho
+        kraus_rho_kdag = kraus_rho @ kraus_op.conj().T
+        rho_out = rho_out + kraus_rho_kdag
 
     return rho_out
 
@@ -234,10 +233,9 @@ def compose_kraus_channels(
 
     # Build composite Kraus operators: L_j K_i for all pairs
     composite_ops = []
-    for K in first.kraus_ops:
-        for L in second.kraus_ops:
-            # L @ K
-            composite_op = L @ K
+    for first_op in first.kraus_ops:
+        for second_op in second.kraus_ops:
+            composite_op = second_op @ first_op
             composite_ops.append(composite_op)
 
     # Create composite channel
@@ -255,6 +253,8 @@ __all__ = [
     "apply_kraus_channel_to_statevector",
     "compose_kraus_channels",
 ]
+
+
 
 
 

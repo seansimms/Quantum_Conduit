@@ -1,21 +1,19 @@
 """Variational algorithm scaffolding for VQE and QAOA."""
 
 from .ansatz import (
-    VariationalAnsatz,
     HardwareEfficientAnsatz,
     LayeredEntanglerAnsatz,
     QAOAAnsatz,
+    VariationalAnsatz,
 )
-
+from .qaoa import (
+    QAOAResult,
+    run_qaoa,
+)
 from .vqe import (
     VQEResult,
     evaluate_expectation_value,
     run_vqe,
-)
-
-from .qaoa import (
-    QAOAResult,
-    run_qaoa,
 )
 
 __all__ = [
@@ -29,6 +27,8 @@ __all__ = [
     "QAOAResult",
     "run_qaoa",
 ]
+
+
 
 
 

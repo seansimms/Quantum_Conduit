@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Mapping, MutableMapping, Optional, Sequence
+from typing import Dict, Mapping, Sequence
 
 import torch
 
@@ -193,6 +193,8 @@ def marginalize_probs(
             j |= bit << bit_pos
         marg[..., j] += probs[..., i]
     return marg
+
+
 
 
 

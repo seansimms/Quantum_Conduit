@@ -1,8 +1,7 @@
 """Tests for circuit drawer visualization."""
 
-import pytest
 from qconduit.circuit import QuantumCircuit
-from qconduit.viz.drawer import to_text, print_circuit, _format_angle
+from qconduit.viz.drawer import _format_angle, print_circuit, to_text
 
 
 def test_format_angle():
@@ -150,7 +149,7 @@ def test_angle_formatting_edge_cases():
     assert _format_angle(math.pi / 8)  # Should format as decimal
     assert _format_angle(2 * math.pi)  # Should format as 2π or decimal
     assert _format_angle(-math.pi / 8)
-    
+
     # Test specific multiples
     assert _format_angle(3 * math.pi / 4) == "3π/4"
     assert _format_angle(-3 * math.pi / 4) == "-3π/4"
@@ -158,7 +157,7 @@ def test_angle_formatting_edge_cases():
     assert _format_angle(-2 * math.pi / 2) == "-π"
     assert _format_angle(5 * math.pi / 4)  # Should format as 5π/4
     assert _format_angle(-5 * math.pi / 4)  # Should format as -5π/4
-    
+
     # Test multiples of pi/2 that aren't ±1 (but not multiples of pi/4)
     # 3π/2 is a multiple of pi/4 (6 * π/4), so test something else
     # Actually, all multiples of pi/2 are also multiples of pi/4, so this path is hard to hit

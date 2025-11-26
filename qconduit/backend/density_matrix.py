@@ -13,7 +13,8 @@ from typing import Optional, Tuple
 
 import torch
 
-from ..core.device import Device, default_device, device as device_factory
+from ..core.device import Device, default_device
+from ..core.device import device as device_factory
 from .statevector import zero_state
 
 
@@ -186,14 +187,14 @@ def apply_kraus_single_qubit(
     # Validate Kraus operators
     if len(kraus_ops) == 0:
         raise ValueError("kraus_ops must contain at least one operator")
-    for i, E in enumerate(kraus_ops):
-        if E.shape != (2, 2):
+    for i, kraus_op_e in enumerate(kraus_ops):
+        if kraus_op_e.shape != (2, 2):
             raise ValueError(
-                f"Kraus operator {i} must have shape (2, 2), got {E.shape}"
+                f"Kraus operator {i} must have shape (2, 2), got {kraus_op_e.shape}"
             )
-        if not torch.is_complex(E):
+        if not torch.is_complex(kraus_op_e):
             raise ValueError(
-                f"Kraus operator {i} must be complex dtype, got {E.dtype}"
+                f"Kraus operator {i} must be complex dtype, got {kraus_op_e.dtype}"
             )
 
     # Get dtype and device from rho
@@ -204,32 +205,36 @@ def apply_kraus_single_qubit(
     # For qubit q, we use E if q == qubit, else I
     # Convention: qubit 0 is LSB, so we build from qubit n_qubits-1 down to 0
     # This matches the convention used in PauliSum.to_matrix
-    I_single = torch.eye(2, dtype=dtype, device=device)
+    identity_single = torch.eye(2, dtype=dtype, device=device)
 
     full_kraus_ops = []
-    for E in kraus_ops:
+    for kraus_op_e in kraus_ops:
         # Ensure E has correct dtype and device
-        E = E.to(dtype=dtype, device=device)
+        kraus_op_e = kraus_op_e.to(dtype=dtype, device=device)
 
         # Build tensor product: P_{n-1} ⊗ P_{n-2} ⊗ ... ⊗ P_0
         # where P_i = E if i == qubit, else I
-        F = E if (n_qubits - 1) == qubit else I_single
+        full_kraus_op = (
+            kraus_op_e if (n_qubits - 1) == qubit else identity_single
+        )
         for q in range(n_qubits - 2, -1, -1):
             if q == qubit:
-                op = E
+                op = kraus_op_e
             else:
-                op = I_single
-            F = _kron(F, op)
+                op = identity_single
+            full_kraus_op = _kron(full_kraus_op, op)
 
-        full_kraus_ops.append(F)
+        full_kraus_ops.append(full_kraus_op)
 
     # Apply channel: rho -> sum_k F_k rho F_k^dagger
     new_rho = torch.zeros_like(rho)
-    for F in full_kraus_ops:
+    for full_kraus_op in full_kraus_ops:
         # Broadcast over batch dims: (..., dim, dim) @ (dim, dim) -> (..., dim, dim)
-        Frho = torch.matmul(F, rho)
-        FrhoFdag = torch.matmul(Frho, F.conj().transpose(-2, -1))
-        new_rho = new_rho + FrhoFdag
+        full_kraus_op_rho = torch.matmul(full_kraus_op, rho)
+        full_kraus_op_rho_dag = torch.matmul(
+            full_kraus_op_rho, full_kraus_op.conj().transpose(-2, -1)
+        )
+        new_rho = new_rho + full_kraus_op_rho_dag
 
     return new_rho
 
@@ -337,6 +342,8 @@ def measure_expectation_z_dm(
     expectation = (probs * signs).sum(dim=-1)
 
     return expectation
+
+
 
 
 

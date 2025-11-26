@@ -9,9 +9,9 @@ import torch
 
 from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate, zero_state
 from qconduit.circuit import QuantumCircuit
-from qconduit.gates.standard import CNOT, H, RX, RZ
+from qconduit.gates.standard import CNOT, RX, RZ, H
 from qconduit.layers.ansatzes import ParametricAnsatz
-from qconduit.operators import PauliTerm, PauliSum
+from qconduit.operators import PauliSum, PauliTerm
 
 
 @dataclass(frozen=True)

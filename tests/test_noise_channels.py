@@ -30,7 +30,6 @@ class TestSingleQubitChannelValidation:
 
     def test_invalid_empty_kraus_operators(self):
         """Test that empty Kraus operators raise ValueError."""
-        I = torch.eye(2, dtype=torch.complex64)
         with pytest.raises(ValueError, match="non-empty"):
             SingleQubitChannel(name="test", kraus_operators=())
 
@@ -130,8 +129,11 @@ class TestLimitingCases:
         """Test depolarizing channel with p=0 is identity."""
         ch = depolarizing_channel(0.0)
         # Test on |0> and |1>
-        for state_name, state_vec in [("|0>", torch.tensor([1.0, 0.0], dtype=torch.complex64)),
-                                       ("|1>", torch.tensor([0.0, 1.0], dtype=torch.complex64))]:
+        states = [
+            ("|0>", torch.tensor([1.0, 0.0], dtype=torch.complex64)),
+            ("|1>", torch.tensor([0.0, 1.0], dtype=torch.complex64)),
+        ]
+        for state_name, state_vec in states:
             rho = dm_from_statevector(state_vec)
             rho_new = apply_kraus_single_qubit(
                 rho, ch.kraus_operators, qubit=0, n_qubits=1
@@ -156,7 +158,9 @@ class TestLimitingCases:
         expected_0[1, 1] = 2.0 / 3.0
         diff_0 = rho_new_0 - expected_0
         max_diff_0 = torch.max(torch.abs(diff_0)).item()
-        assert max_diff_0 < 1e-6, f"p=1 on |0> should produce [[1/3,0],[0,2/3]], got max diff = {max_diff_0}"
+        assert (
+            max_diff_0 < 1e-6
+        ), f"p=1 on |0> should produce [[1/3,0],[0,2/3]], got max diff = {max_diff_0}"
 
         # For |1>, the channel produces (2/3)|0><0| + (1/3)|1><1|
         state_1 = torch.tensor([0.0, 1.0], dtype=torch.complex64)
@@ -170,14 +174,18 @@ class TestLimitingCases:
         expected_1[1, 1] = 1.0 / 3.0
         diff_1 = rho_new_1 - expected_1
         max_diff_1 = torch.max(torch.abs(diff_1)).item()
-        assert max_diff_1 < 1e-6, f"p=1 on |1> should produce [[2/3,0],[0,1/3]], got max diff = {max_diff_1}"
+        assert (
+            max_diff_1 < 1e-6
+        ), f"p=1 on |1> should produce [[2/3,0],[0,1/3]], got max diff = {max_diff_1}"
 
         # The average over |0> and |1> should be I/2
         rho_avg = (rho_new_0 + rho_new_1) / 2.0
         I_half = torch.eye(2, dtype=torch.complex64) / 2.0
         diff_avg = rho_avg - I_half
         max_diff_avg = torch.max(torch.abs(diff_avg)).item()
-        assert max_diff_avg < 1e-6, f"Average should be I/2, got max diff = {max_diff_avg}"
+        assert (
+            max_diff_avg < 1e-6
+        ), f"Average should be I/2, got max diff = {max_diff_avg}"
 
     def test_phase_damping_p0_is_identity(self):
         """Test phase damping channel with p=0 is identity."""

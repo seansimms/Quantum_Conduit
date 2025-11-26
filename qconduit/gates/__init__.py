@@ -1,17 +1,17 @@
 """Quantum gate implementations."""
 
 from .standard import (
-    I,
-    X,
-    Y,
-    Z,
-    H,
-    S,
-    T,
     CNOT,
     RX,
     RY,
     RZ,
+    H,
+    I,
+    S,
+    T,
+    X,
+    Y,
+    Z,
     is_unitary,
 )
 

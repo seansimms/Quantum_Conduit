@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import torch
-import math
 import cmath
+import math
 from typing import TYPE_CHECKING
+
+import torch
 
 if TYPE_CHECKING:
     pass
@@ -249,14 +250,14 @@ def RX(
         half_theta = theta_float / 2.0
         cos_half = torch.cos(half_theta)
         sin_half = torch.sin(half_theta)
-        
+
         # Build complex matrix using tensor operations
         # Convert to complex dtype
         if dtype is None:
             dtype = torch.complex64
         cos_half_c = cos_half.to(dtype=dtype)
         sin_half_c = sin_half.to(dtype=dtype)
-        
+
         # Build matrix elements
         matrix = torch.stack([
             torch.stack([cos_half_c, -1.0j * sin_half_c]),
@@ -269,12 +270,12 @@ def RX(
             dtype = torch.complex64
         if device is None:
             device = torch.device("cpu")
-        
+
         theta_val = float(theta)
         half_theta = theta_val / 2.0
         cos_half = math.cos(half_theta)
         sin_half = math.sin(half_theta)
-        
+
         return torch.tensor(
             [[cos_half, -1.0j * sin_half], [-1.0j * sin_half, cos_half]],
             dtype=dtype,
@@ -314,14 +315,14 @@ def RY(
         half_theta = theta_float / 2.0
         cos_half = torch.cos(half_theta)
         sin_half = torch.sin(half_theta)
-        
+
         # Build complex matrix using tensor operations
         # Convert to complex dtype
         if dtype is None:
             dtype = torch.complex64
         cos_half_c = cos_half.to(dtype=dtype)
         sin_half_c = sin_half.to(dtype=dtype)
-        
+
         # Build matrix elements (RY has real matrix elements)
         matrix = torch.stack([
             torch.stack([cos_half_c, -sin_half_c]),
@@ -334,12 +335,12 @@ def RY(
             dtype = torch.complex64
         if device is None:
             device = torch.device("cpu")
-        
+
         theta_val = float(theta)
         half_theta = theta_val / 2.0
         cos_half = math.cos(half_theta)
         sin_half = math.sin(half_theta)
-        
+
         return torch.tensor(
             [[cos_half, -sin_half], [sin_half, cos_half]],
             dtype=dtype,
@@ -377,7 +378,7 @@ def RZ(
         # Convert to float32 for computation
         theta_float = theta.to(dtype=torch.float32)
         half_theta = theta_float / 2.0
-        
+
         # Use PyTorch complex exponential
         if dtype is None:
             dtype = torch.complex64
@@ -385,7 +386,7 @@ def RZ(
         half_theta_c = half_theta.to(dtype=dtype)
         exp_neg = torch.exp(-1.0j * half_theta_c)
         exp_pos = torch.exp(1.0j * half_theta_c)
-        
+
         # Build matrix
         zero = torch.zeros_like(exp_neg)
         matrix = torch.stack([
@@ -399,12 +400,12 @@ def RZ(
             dtype = torch.complex64
         if device is None:
             device = torch.device("cpu")
-        
+
         theta_val = float(theta)
         half_theta = theta_val / 2.0
         exp_neg = cmath.exp(-1.0j * half_theta)
         exp_pos = cmath.exp(1.0j * half_theta)
-        
+
         return torch.tensor(
             [[exp_neg, 0.0], [0.0, exp_pos]],
             dtype=dtype,

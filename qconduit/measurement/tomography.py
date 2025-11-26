@@ -55,21 +55,24 @@ def pauli_matrix_from_label(
     """
     if len(label) < 1:
         raise ValueError("label must be non-empty")
-    
+
     # Validate all characters
-    for c in label:
-        if c not in _PAULI_DICT:
-            raise ValueError(f"Invalid Pauli label character '{c}'. Must be one of {{'I', 'X', 'Y', 'Z'}}")
-    
+    for char in label:
+        if char not in _PAULI_DICT:
+            raise ValueError(
+                f"Invalid Pauli label character '{char}'. Must be one of "
+                "{'I', 'X', 'Y', 'Z'}"
+            )
+
     # Build tensor product
     op = _PAULI_DICT[label[0]]
     for c in label[1:]:
         op = torch.kron(op, _PAULI_DICT[c])
-    
+
     # Move to device if provided
     if device is not None:
         op = op.to(device=device)
-    
+
     return op
 
 
@@ -102,33 +105,33 @@ def pauli_expectation_from_statevector(
     """
     if state.ndim != 1:
         raise ValueError(f"state must be 1D, got shape {state.shape}")
-    
+
     dim = state.shape[0]
     if dim == 0:
         raise ValueError("state must have non-zero length")
-    
+
     n_qubits = len(label)
     if n_qubits < 1:
         raise ValueError("label must be non-empty")
-    
+
     expected_dim = 1 << n_qubits
     if dim != expected_dim:
         raise ValueError(
             f"State dimension {dim} does not match label length {n_qubits} "
             f"(expected 2**{n_qubits} = {expected_dim})."
         )
-    
+
     # Cast state to complex128
     state_c = state.to(dtype=torch.complex128)
-    
+
     # Build Pauli operator
-    P = pauli_matrix_from_label(label, device=state_c.device)
-    
+    pauli_op = pauli_matrix_from_label(label, device=state_c.device)
+
     # Compute ⟨ψ|P|ψ⟩
     bra = state_c.conj().unsqueeze(0)  # (1, dim)
     ket = state_c.unsqueeze(1)         # (dim, 1)
-    value = (bra @ (P @ ket)).item()
-    
+    value = (bra @ (pauli_op @ ket)).item()
+
     return complex(value)
 
 
@@ -157,19 +160,19 @@ def single_qubit_pauli_expectations_from_statevector(
         raise ValueError(f"state must be 1D, got shape {state.shape}")
     if state.shape[0] != 2:
         raise ValueError(f"state must have length 2 for single-qubit, got {state.shape[0]}")
-    
+
     # Normalize state
     s = state.to(dtype=torch.complex128)
     norm = s.abs().pow(2).sum().sqrt()
     if norm == 0:
         raise ValueError("Statevector has zero norm.")
     s = s / norm
-    
+
     # Compute expectations
     ex_x = pauli_expectation_from_statevector(s, "X")
     ex_y = pauli_expectation_from_statevector(s, "Y")
     ex_z = pauli_expectation_from_statevector(s, "Z")
-    
+
     # Return real parts as floats
     return (float(ex_x.real), float(ex_y.real), float(ex_z.real))
 
@@ -200,20 +203,20 @@ def reconstruct_single_qubit_density_from_pauli(
     ex_x_t = float(ex_x)
     ex_y_t = float(ex_y)
     ex_z_t = float(ex_z)
-    
+
     # Get Pauli matrices on the correct device
-    I_mat = _I.to(device=device) if device is not None else _I
-    X_mat = _X.to(device=device) if device is not None else _X
-    Y_mat = _Y.to(device=device) if device is not None else _Y
-    Z_mat = _Z.to(device=device) if device is not None else _Z
-    
+    ident = _I.to(device=device) if device is not None else _I
+    x_mat = _X.to(device=device) if device is not None else _X
+    y_mat = _Y.to(device=device) if device is not None else _Y
+    z_mat = _Z.to(device=device) if device is not None else _Z
+
     rho = 0.5 * (
-        I_mat
-        + ex_x_t * X_mat
-        + ex_y_t * Y_mat
-        + ex_z_t * Z_mat
+        ident
+        + ex_x_t * x_mat
+        + ex_y_t * y_mat
+        + ex_z_t * z_mat
     )
-    
+
     return rho
 
 
@@ -242,14 +245,14 @@ def two_qubit_pauli_expectations_from_statevector(
         raise ValueError(f"state must be 1D, got shape {state.shape}")
     if state.shape[0] != 4:
         raise ValueError(f"state must have length 4 for two-qubit, got {state.shape[0]}")
-    
+
     # Normalize state
     s = state.to(dtype=torch.complex128)
     norm = s.abs().pow(2).sum().sqrt()
     if norm == 0:
         raise ValueError("Statevector has zero norm.")
     s = s / norm
-    
+
     # Required labels
     required_labels = [
         "II", "IX", "IY", "IZ",
@@ -257,13 +260,13 @@ def two_qubit_pauli_expectations_from_statevector(
         "YI", "YX", "YY", "YZ",
         "ZI", "ZX", "ZY", "ZZ",
     ]
-    
+
     # Compute expectations
     expectations = {}
     for label in required_labels:
         ex = pauli_expectation_from_statevector(s, label)
         expectations[label] = float(ex.real)
-    
+
     return expectations
 
 
@@ -310,29 +313,29 @@ def reconstruct_two_qubit_density_from_pauli(
         "YI", "YX", "YY", "YZ",
         "ZI", "ZX", "ZY", "ZZ",
     ]
-    
+
     # Validate all labels are present
     missing = [lbl for lbl in required_labels if lbl not in expectations]
     if missing:
         raise ValueError(
             f"Missing required expectation values for labels: {missing}"
         )
-    
+
     # Initialize density matrix
     if device is None:
         device = default_device().as_torch_device()
-    
+
     rho = torch.zeros((4, 4), dtype=torch.complex128, device=device)
-    
+
     # Accumulate terms
     for lbl in required_labels:
         c = float(expectations[lbl])
-        P = pauli_matrix_from_label(lbl, device=device)
-        rho = rho + c * P
-    
+        pauli_op = pauli_matrix_from_label(lbl, device=device)
+        rho = rho + c * pauli_op
+
     # Scale by 1/4
     rho = 0.25 * rho
-    
+
     return rho
 
 
@@ -344,6 +347,8 @@ __all__ = [
     "two_qubit_pauli_expectations_from_statevector",
     "reconstruct_two_qubit_density_from_pauli",
 ]
+
+
 
 
 

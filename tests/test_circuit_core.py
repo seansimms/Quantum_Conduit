@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import math
+
 import pytest
 import torch
 
 from qconduit.circuit import QuantumCircuit
-from qconduit.backend.statevector import zero_state
 
 
 def test_circuit_simulates_bell_state() -> None:
@@ -15,9 +15,10 @@ def test_circuit_simulates_bell_state() -> None:
     circuit = QuantumCircuit(n_qubits=2)
     # |00> --H on qubit 0--> (|00> + |01>)/sqrt(2) (qubit 0 is LSB)
     circuit.add_gate("H", [0])
-    # CNOT with qubit 1 as control, qubit 0 as target
+    # CNOT with qubit 0 as control, qubit 1 as target
+    # When q0=1 (in |01⟩), flip q1: |01⟩ -> |11⟩
     # This creates (|00> + |11>)/sqrt(2) Bell state
-    circuit.add_gate("CNOT", [1, 0])
+    circuit.add_gate("CNOT", [0, 1])
 
     state = circuit.simulate_state()
 

@@ -363,7 +363,7 @@ def _resolve_two_qubit_gate(
 
 def _apply_single_qubit_unitary_to_dm(
     rho: torch.Tensor,
-    U: torch.Tensor,
+    unitary: torch.Tensor,
     qubit: int,
     n_qubits: int,
 ) -> torch.Tensor:
@@ -371,27 +371,24 @@ def _apply_single_qubit_unitary_to_dm(
     dtype = rho.dtype
     device = rho.device
 
-    I_single = torch.eye(2, dtype=dtype, device=device)
+    identity_single = torch.eye(2, dtype=dtype, device=device)
 
-    # Build U_full = I ⊗ ... ⊗ U ⊗ ... ⊗ I
+    # Build embedded unitary
     # Convention: qubit 0 is LSB, build from n_qubits-1 down to 0
-    U_full = U if (n_qubits - 1) == qubit else I_single
+    full_unitary = unitary if (n_qubits - 1) == qubit else identity_single
     for q in range(n_qubits - 2, -1, -1):
-        if q == qubit:
-            op = U
-        else:
-            op = I_single
-        U_full = torch.kron(U_full, op)
+        operand = unitary if q == qubit else identity_single
+        full_unitary = torch.kron(full_unitary, operand)
 
     # Apply unitary: rho -> U_full rho U_full^\dagger
-    Urho = torch.matmul(U_full, rho)
-    UrhoUdag = torch.matmul(Urho, U_full.conj().transpose(-2, -1))
-    return UrhoUdag
+    tmp = torch.matmul(full_unitary, rho)
+    result = torch.matmul(tmp, full_unitary.conj().transpose(-2, -1))
+    return result
 
 
 def _apply_two_qubit_unitary_to_dm(
     rho: torch.Tensor,
-    U: torch.Tensor,
+    unitary: torch.Tensor,
     qubit1: int,
     qubit2: int,
     n_qubits: int,
@@ -407,7 +404,7 @@ def _apply_two_qubit_unitary_to_dm(
     # Build full 4x4 unitary matrix for the two qubits
     # We need to embed U into the full system
     # Strategy: build matrix element by element
-    U_full = torch.zeros((dim, dim), dtype=dtype, device=device)
+    full_unitary = torch.zeros((dim, dim), dtype=dtype, device=device)
 
     # Iterate over all basis states
     for i in range(dim):
@@ -435,12 +432,12 @@ def _apply_two_qubit_unitary_to_dm(
             if other_bits_match:
                 # Build the full index contribution
                 # We need to compute the full index from the bit pattern
-                U_full[i, j] = U[twoq_i, twoq_j]
+                full_unitary[i, j] = unitary[twoq_i, twoq_j]
 
     # Apply unitary: rho -> U_full rho U_full^\dagger
-    Urho = torch.matmul(U_full, rho)
-    UrhoUdag = torch.matmul(Urho, U_full.conj().transpose(-2, -1))
-    return UrhoUdag
+    tmp = torch.matmul(full_unitary, rho)
+    result = torch.matmul(tmp, full_unitary.conj().transpose(-2, -1))
+    return result
 
 
 __all__ = [

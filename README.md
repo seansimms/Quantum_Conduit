@@ -1140,6 +1140,26 @@ The `examples/` directory contains complete, runnable examples:
 - **`vqe_h2.py`**: Variational Quantum Eigensolver for finding ground-state energy
 - **`hybrid_classifier.py`**: Hybrid quantum-classical neural network for classification
 
+### Quantum Textbook Algorithms (G23)
+
+```python
+from qconduit.quantum.algorithms import grover
+from qconduit.quantum.simulation import initial_state
+
+
+def oracle(x: int) -> int:
+    return 1 if x == 3 else 0
+
+
+# Prepare |00> and run Grover's search
+state = initial_state(2)
+solution = grover(oracle, n_qubits=2)
+print("Grover found solution:", solution)
+```
+
+This educational toolkit follows the treatment in Nielsen & Chuang,
+*Quantum Computation and Quantum Information*.
+
 Run examples directly:
 
 ```bash

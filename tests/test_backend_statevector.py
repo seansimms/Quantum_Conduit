@@ -1,8 +1,10 @@
 """Tests for statevector backend operations."""
 
+import math
+
 import pytest
 import torch
-import math
+
 import qconduit as qc
 
 
@@ -132,6 +134,21 @@ class TestApplyGate:
 class TestApplyTwoQubitGate:
     """Tests for apply_two_qubit_gate function."""
 
+    def test_apply_cnot_lsb_control(self):
+        """Control on qubit 0 (LSB) should flip MSB target."""
+        state = qc.zero_state(n_qubits=2)
+        h_gate = qc.H()
+        state = qc.apply_gate(state, h_gate, qubit=0, n_qubits=2)
+        cnot = qc.CNOT(control_first=True)
+        result = qc.apply_two_qubit_gate(
+            state, cnot, qubit1=0, qubit2=1, n_qubits=2
+        )
+        sqrt2_inv = 1.0 / math.sqrt(2.0)
+        expected = torch.zeros(4, dtype=torch.complex64)
+        expected[0] = sqrt2_inv
+        expected[3] = sqrt2_inv
+        assert torch.allclose(result, expected, atol=1e-6)
+
     def test_apply_cnot_control_first(self):
         """Test CNOT with control on qubit 1, target on qubit 0."""
         # Start with |10⟩ (index 2)
@@ -147,15 +164,21 @@ class TestApplyTwoQubitGate:
         assert torch.allclose(result, expected)
 
     def test_apply_cnot_control_second(self):
-        """Test CNOT with control on qubit 0, target on qubit 1."""
-        # Start with |01⟩ (index 1)
+        """Test CNOT with control on qubit 1, target on qubit 0.
+
+        When using CNOT(control_first=False), the gate matrix has the second
+        index as control. With qubit1=0, qubit2=1, this means qubit2 (q1) is
+        control and qubit1 (q0) is target.
+        """
+        # Start with |10⟩ (index 2): q0=0, q1=1
         state = torch.zeros(4, dtype=torch.complex64)
-        state[1] = 1.0  # |01⟩
+        state[2] = 1.0  # |10⟩
 
         cnot = qc.CNOT(control_first=False)
+        # qubit1=0 maps to first gate index (target), qubit2=1 maps to second (control)
         result = qc.apply_two_qubit_gate(state, cnot, qubit1=0, qubit2=1, n_qubits=2)
 
-        # Should yield |11⟩ (index 3)
+        # Control q1=1, so target q0 flips: 0->1, result is |11⟩ (index 3)
         expected = torch.zeros(4, dtype=torch.complex64)
         expected[3] = 1.0  # |11⟩
         assert torch.allclose(result, expected)

@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
-import torch
 
-from qconduit.operators import PauliTerm, PauliSum
 from qconduit.algorithms import Edge, ising_maxcut_hamiltonian
+from qconduit.operators import PauliSum
 
 
 def test_ising_maxcut_hamiltonian_two_nodes_single_edge() -> None:
@@ -154,6 +151,8 @@ def test_ising_maxcut_hamiltonian_self_loop_skipped() -> None:
 
     assert abs(const_coeff - 0.5) < 1e-8
     assert abs(zz_coeff + 0.5) < 1e-8
+
+
 
 
 

@@ -1,16 +1,15 @@
 """Tests for debug mode functionality."""
 
-import pytest
 import torch
 
+from qconduit.backend.statevector import apply_gate, zero_state
+from qconduit.core.device import default_device
 from qconduit.diagnostics import (
+    debug_context,
     is_debug_enabled,
     set_debug_enabled,
-    debug_context,
 )
-from qconduit.backend.statevector import apply_gate, zero_state
 from qconduit.gates import standard as stdgates
-from qconduit.core.device import default_device
 
 
 def test_debug_mode_toggle_and_context() -> None:

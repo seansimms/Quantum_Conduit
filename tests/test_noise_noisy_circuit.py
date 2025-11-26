@@ -175,7 +175,9 @@ class TestTwoQubitCircuitWithLocalNoise:
         expected_1 = torch.eye(2, dtype=torch.complex64) / 2.0
         diff_1 = rho_1 - expected_1
         max_diff_1 = torch.max(torch.abs(diff_1)).item()
-        assert max_diff_1 < 1e-6, f"Qubit 1 reduced state should be I/2, got max diff = {max_diff_1}"
+        assert (
+            max_diff_1 < 1e-6
+        ), f"Qubit 1 reduced state should be I/2, got max diff = {max_diff_1}"
 
 
 class TestSamplingConsistency:
@@ -200,7 +202,9 @@ class TestSamplingConsistency:
         )
 
         # Check shape
-        assert samples.shape == (5000, 1), f"Expected shape (5000, 1), got {samples.shape}"
+        assert (
+            samples.shape == (5000, 1)
+        ), f"Expected shape (5000, 1), got {samples.shape}"
 
         # Compute empirical frequencies
         counts_0 = (samples[:, 0] == 0).sum().item()
@@ -209,8 +213,12 @@ class TestSamplingConsistency:
         freq_1 = counts_1 / 5000.0
 
         # Should be approximately 0.5 each (within ±0.05)
-        assert abs(freq_0 - 0.5) < 0.05, f"Frequency of 0 should be ~0.5, got {freq_0}"
-        assert abs(freq_1 - 0.5) < 0.05, f"Frequency of 1 should be ~0.5, got {freq_1}"
+        assert (
+            abs(freq_0 - 0.5) < 0.05
+        ), f"Frequency of 0 should be ~0.5, got {freq_0}"
+        assert (
+            abs(freq_1 - 0.5) < 0.05
+        ), f"Frequency of 1 should be ~0.5, got {freq_1}"
 
     def test_sampling_reproducibility(self):
         """Test that sampling with same generator seed is reproducible."""

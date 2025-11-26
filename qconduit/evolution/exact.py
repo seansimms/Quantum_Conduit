@@ -73,7 +73,9 @@ def exact_time_evolution_statevector(
     state = state.to(dtype=torch.complex128, device=device)
 
     # Get dense Hamiltonian matrix
-    h_matrix = paulisum_to_dense(hamiltonian, num_qubits=n_qubits, device=device, dtype=torch.complex128)
+    h_matrix = paulisum_to_dense(
+        hamiltonian, num_qubits=n_qubits, device=device, dtype=torch.complex128
+    )
 
     # Compute exp(-i H t) via eigendecomposition
     # H is Hermitian, so we use eigh

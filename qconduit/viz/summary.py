@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 from collections import Counter
-from typing import Dict, IO, Optional
+from typing import IO, Dict, Optional
 
 import torch
 
@@ -67,6 +67,9 @@ def print_circuit_summary(
 ) -> None:
     """
     Pretty-print a circuit summary to stdout or a file.
+
+    This is a utility function for human-readable output, so it uses print()
+    intentionally. For programmatic access, use circuit_summary() instead.
 
     Parameters
     ----------
@@ -129,21 +132,21 @@ def _circuit_to_unitary_small(
 
 
 def _compare_unitaries(
-    U1: torch.Tensor,
-    U2: torch.Tensor,
+    u1: torch.Tensor,
+    u2: torch.Tensor,
     atol: float = 1e-6,
 ) -> bool:
     """
     Compare two unitaries up to global phase.
 
-    Two unitaries U1 and U2 are equivalent up to global phase if
-    U1 = e^(iφ) * U2 for some phase φ.
+    Two unitaries u1 and u2 are equivalent up to global phase if
+    u1 = e^(iφ) * u2 for some phase φ.
 
     Parameters
     ----------
-    U1:
+    u1:
         First unitary matrix.
-    U2:
+    u2:
         Second unitary matrix.
     atol:
         Absolute tolerance for comparison.
@@ -153,14 +156,14 @@ def _compare_unitaries(
     bool
         True if unitaries are equivalent up to global phase.
     """
-    if U1.shape != U2.shape:
+    if u1.shape != u2.shape:
         return False
 
-    # Check if U1 and U2 are proportional (up to global phase)
-    # Compute ratio: U1 / U2 (element-wise, avoiding division by zero)
-    # For unitary matrices, if U1 = e^(iφ) U2, then U1 @ U2^dagger = e^(iφ) I
-    U2_dag = U2.conj().T
-    product = U1 @ U2_dag
+    # Check if u1 and u2 are proportional (up to global phase)
+    # Compute ratio: u1 / u2 (element-wise, avoiding division by zero)
+    # For unitary matrices, if u1 = e^(iφ) u2, then u1 @ u2^dagger = e^(iφ) I
+    u2_dag = u2.conj().T
+    product = u1 @ u2_dag
 
     # Extract diagonal elements (should all be equal to e^(iφ))
     diag = torch.diag(product)
@@ -171,7 +174,7 @@ def _compare_unitaries(
     first_phase = diag[0]
     if torch.abs(first_phase) < atol:
         # Check if matrices are zero
-        return torch.allclose(U1, U2, atol=atol)
+        return torch.allclose(u1, u2, atol=atol)
 
     # Normalize by first element
     normalized = diag / first_phase
@@ -232,10 +235,10 @@ def compare_circuits(
     if circ_a.n_qubits == circ_b.n_qubits:
         dim = 2**circ_a.n_qubits
         if dim <= max_dim_for_unitary:
-            U_a = _circuit_to_unitary_small(circ_a, max_dim=max_dim_for_unitary)
-            U_b = _circuit_to_unitary_small(circ_b, max_dim=max_dim_for_unitary)
-            if U_a is not None and U_b is not None:
-                same_unitary = _compare_unitaries(U_a, U_b)
+            u_a = _circuit_to_unitary_small(circ_a, max_dim=max_dim_for_unitary)
+            u_b = _circuit_to_unitary_small(circ_b, max_dim=max_dim_for_unitary)
+            if u_a is not None and u_b is not None:
+                same_unitary = _compare_unitaries(u_a, u_b)
 
     return {
         "same_unitary": same_unitary,
@@ -243,4 +246,6 @@ def compare_circuits(
         "depth_diff": depth_diff,
         "param_diff": param_diff,
     }
+
+
 

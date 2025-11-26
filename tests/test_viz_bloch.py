@@ -1,12 +1,13 @@
 """Tests for Bloch sphere coordinate computation and plotting."""
 
-import pytest
-import torch
 import math
 
+import pytest
+import torch
+
 from qconduit.viz.bloch import (
-    bloch_coords_from_statevector,
     bloch_coords_from_density,
+    bloch_coords_from_statevector,
     partial_trace_statevector,
 )
 
@@ -142,8 +143,11 @@ def test_plot_bloch_vector_no_matplotlib():
     # This test assumes matplotlib might not be installed
     # We'll skip if it is installed, or test the error if not
     try:
-        import matplotlib
-        pytest.skip("matplotlib is installed")
+        import importlib.util
+
+        spec = importlib.util.find_spec("matplotlib")
+        if spec is not None:
+            pytest.skip("matplotlib is installed")
     except ImportError:
         from qconduit.viz.bloch import plot_bloch_vector
         with pytest.raises(RuntimeError, match="matplotlib"):

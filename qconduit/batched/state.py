@@ -68,7 +68,6 @@ class BatchedState:
         # Ensure complex dtype
         if not torch.is_complex(self.states):
             # Convert to complex128 on default device
-            device = self.states.device
             qdevice = default_device()
             target_device = qdevice.as_torch_device()
             new_states = self.states.to(dtype=torch.complex128, device=target_device)

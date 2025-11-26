@@ -119,19 +119,18 @@ def apply_circuit_to_batched_states(
             f"batched.n_qubits={batched.n_qubits}"
         )
 
-    B, dim = batched.states.shape
+    batch_size, dim = batched.states.shape
     device = batched.states.device
     dtype = batched.states.dtype
 
     # Check if we can use vectorized path
-    # Memory estimate: B * dim * dim elements for batched matmul
-    memory_elements = B * dim * dim
+    memory_elements = batch_size * dim * dim
     use_vectorized = memory_elements <= MAX_VECTORIZE_ELEMENTS
 
     if use_vectorized:
         try:
             # Compute unitary matrix
-            U = _circuit_to_unitary(circuit, device=device, dtype=dtype)
+            unitary = _circuit_to_unitary(circuit, device=device, dtype=dtype)
 
             # Apply unitary: states_out = states @ U.conj().T
             # For quantum circuits, U|psi⟩ means we compute U @ psi
@@ -139,7 +138,7 @@ def apply_circuit_to_batched_states(
             # Actually, we want U|psi⟩, so for row vectors: (U @ psi.T).T = psi @ U.T
             # But U is column-major (U[:, i] = U|i⟩), so U.T gives row-major
             # For batched: (B, dim) @ (dim, dim) -> (B, dim)
-            states_out = batched.states @ U.T
+            states_out = batched.states @ unitary.T
 
             return BatchedState(states=states_out, n_qubits=batched.n_qubits)
         except Exception:
@@ -158,7 +157,7 @@ def apply_circuit_to_batched_states(
         )
 
         out_rows = []
-        for i in range(B):
+        for i in range(batch_size):
             psi = batched.states[i]
             psi_out = _apply_circuit_to_statevector(circuit, psi, device=qdevice)
             out_rows.append(psi_out)
@@ -217,7 +216,7 @@ def apply_ansatz_batch_to_state(
             f"initial_state must be 1D with shape (dim,), got shape {initial_state.shape}"
         )
 
-    B, d = params_batch.shape
+    batch_size, num_params = params_batch.shape
     dim = initial_state.shape[0]
     device = initial_state.device
     dtype = initial_state.dtype
@@ -227,9 +226,8 @@ def apply_ansatz_batch_to_state(
     if 2**n_qubits != dim:
         raise ValueError(f"initial_state dimension {dim} is not a power of 2")
 
-    # Check memory for vectorized path
-    # We'd need to build B unitaries of size (dim, dim)
-    memory_elements = B * dim * dim
+    # Check memory for vectorized path by estimating elements needed
+    memory_elements = batch_size * dim * dim
     use_vectorized = memory_elements <= MAX_VECTORIZE_ELEMENTS
 
     if use_vectorized:
@@ -245,17 +243,17 @@ def apply_ansatz_batch_to_state(
 
             # Build all unitaries
             unitaries = []
-            for i in range(B):
+            for i in range(batch_size):
                 circuit = ansatz_factory(params_batch[i])
-                U = _circuit_to_unitary(circuit, device=device, dtype=dtype)
-                unitaries.append(U)
+                unitary = _circuit_to_unitary(circuit, device=device, dtype=dtype)
+                unitaries.append(unitary)
 
             # Stack unitaries: (B, dim, dim)
-            U_batch = torch.stack(unitaries, dim=0)
+            unitary_batch = torch.stack(unitaries, dim=0)
 
             # Apply to initial_state: (B, dim, dim) @ (dim, 1) -> (B, dim, 1) -> (B, dim)
             psi_expanded = initial_state.unsqueeze(0).unsqueeze(-1)  # (1, dim, 1)
-            states_out = (U_batch @ psi_expanded).squeeze(-1)  # (B, dim)
+            states_out = (unitary_batch @ psi_expanded).squeeze(-1)
 
             return BatchedState(states=states_out, n_qubits=n_qubits)
         except Exception:
@@ -274,7 +272,7 @@ def apply_ansatz_batch_to_state(
         )
 
         out_rows = []
-        for i in range(B):
+        for i in range(batch_size):
             circuit = ansatz_factory(params_batch[i])
             if circuit.n_qubits != n_qubits:
                 raise ValueError(
@@ -321,9 +319,9 @@ def batched_build_circuits_from_params(
             f"params_batch must be 2D with shape (B, d), got shape {params_batch.shape}"
         )
 
-    B, d = params_batch.shape
+    batch_size, num_params = params_batch.shape
     circuits = []
-    for i in range(B):
+    for i in range(batch_size):
         params_row = params_batch[i]
         circuit = ansatz.build_circuit(params_row)
         circuits.append(circuit)
@@ -368,14 +366,14 @@ def apply_circuits_batch_to_states(
 
     # Handle broadcasting: if states is 1D, broadcast to all circuits
     if states.ndim == 1:
-        B = len(circuits)
+        batch_size = len(circuits)
         dim = states.shape[0]
-        states = states.unsqueeze(0).expand(B, dim)  # (B, dim)
+        states = states.unsqueeze(0).expand(batch_size, dim)
     elif states.ndim == 2:
-        B = states.shape[0]
-        if B != len(circuits):
+        batch_size = states.shape[0]
+        if batch_size != len(circuits):
             raise ValueError(
-                f"states batch size {B} does not match circuits length {len(circuits)}"
+                f"states batch size {batch_size} does not match circuits length {len(circuits)}"
             )
     else:
         raise ValueError(
@@ -398,8 +396,7 @@ def apply_circuits_batch_to_states(
     device = states.device
     dtype = states.dtype
 
-    # Check memory for vectorized path
-    memory_elements = B * dim * dim
+    memory_elements = batch_size * dim * dim
     use_vectorized = memory_elements <= MAX_VECTORIZE_ELEMENTS
 
     if use_vectorized:
@@ -407,15 +404,15 @@ def apply_circuits_batch_to_states(
             # Build all unitaries
             unitaries = []
             for circuit in circuits:
-                U = _circuit_to_unitary(circuit, device=device, dtype=dtype)
-                unitaries.append(U)
+                unitary = _circuit_to_unitary(circuit, device=device, dtype=dtype)
+                unitaries.append(unitary)
 
             # Stack: (B, dim, dim)
-            U_batch = torch.stack(unitaries, dim=0)
+            unitary_batch = torch.stack(unitaries, dim=0)
 
-            # Apply: (B, dim, dim) @ (B, dim, 1) -> (B, dim, 1) -> (B, dim)
-            states_expanded = states.unsqueeze(-1)  # (B, dim, 1)
-            states_out = (U_batch @ states_expanded).squeeze(-1)  # (B, dim)
+            # Apply: (B, dim, dim) @ (B, dim, 1)
+            states_expanded = states.unsqueeze(-1)
+            states_out = (unitary_batch @ states_expanded).squeeze(-1)
 
             return BatchedState(states=states_out, n_qubits=n_qubits)
         except Exception:
@@ -434,7 +431,7 @@ def apply_circuits_batch_to_states(
         )
 
         out_rows = []
-        for i in range(B):
+        for i in range(batch_size):
             circuit = circuits[i]
             psi = states[i]
             psi_out = _apply_circuit_to_statevector(circuit, psi, device=qdevice)
@@ -451,4 +448,6 @@ __all__ = [
     "apply_circuits_batch_to_states",
     "MAX_VECTORIZE_ELEMENTS",
 ]
+
+
 

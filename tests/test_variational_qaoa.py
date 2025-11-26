@@ -5,10 +5,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from qconduit.exact import exact_ground_state
 from qconduit.operators import PauliSum, PauliTerm
 from qconduit.variational import QAOAResult, run_qaoa
-from qconduit.core.device import default_device
 
 
 class TestRunQAOA:
@@ -167,6 +165,8 @@ class TestRunQAOA:
         assert result.optimal_params.shape == (2,)  # 2 * depth
         # Ground state energy is -2 (both qubits in |1⟩)
         assert result.optimal_value < 0.0
+
+
 
 
 

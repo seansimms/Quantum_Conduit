@@ -7,12 +7,12 @@ import math
 import pytest
 import torch
 
+from qconduit.circuit import QuantumCircuit
 from qconduit.transpile import (
     transpile_to_basis,
-    transpile_to_rx_rz_cx_basis,
     transpile_to_clifford_t,
+    transpile_to_rx_rz_cx_basis,
 )
-from qconduit.circuit import QuantumCircuit
 
 
 def _compare_states_up_to_global_phase(
@@ -213,6 +213,8 @@ class TestTranspileToCliffordT:
         state_in = c_in.simulate_state()
         state_ct = c_ct.simulate_state()
         _compare_states_up_to_global_phase(state_in, state_ct)
+
+
 
 
 

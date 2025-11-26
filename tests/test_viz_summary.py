@@ -1,14 +1,13 @@
 """Tests for circuit summary and comparison utilities."""
 
-import pytest
-import math
 import io
+import math
 
 from qconduit.circuit import QuantumCircuit
 from qconduit.viz.summary import (
     circuit_summary,
-    print_circuit_summary,
     compare_circuits,
+    print_circuit_summary,
 )
 
 

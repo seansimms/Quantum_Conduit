@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import torch
 
+from qconduit.backend.statevector import apply_gate, apply_two_qubit_gate, zero_state
 from qconduit.core.device import Device, default_device
-from qconduit.backend.statevector import zero_state, apply_gate, apply_two_qubit_gate
 from qconduit.gates import standard as stdgates
 
 
@@ -188,8 +188,8 @@ class QuantumCircuit:
                 state = apply_gate(state, gate, qubit=q, n_qubits=self._n_qubits)
             elif len(op.qubits) == 2:
                 q0, q1 = op.qubits
-                # For CNOT, the first qubit in the list is the control, second is target
-                # Based on backend tests, we need control_first=False when control < target
+                # For CNOT, the first qubit in the list is the control, second is target.
+                # The gate matrix uses control_first=True, so qubit1=control, qubit2=target.
                 gate = _resolve_two_qubit_gate(name, q0, q1, dtype, torch_device)
                 state = apply_two_qubit_gate(
                     state, gate, qubit1=q0, qubit2=q1, n_qubits=self._n_qubits
@@ -336,10 +336,8 @@ def _resolve_two_qubit_gate(
     n = name.upper()
     if n == "CNOT":
         # The circuit IR convention: first qubit in the list is control, second is target.
-        # To match HardwareEfficientAnsatz behavior, we use control_first=True
-        # when control < target. This ensures consistency with existing ansatz code.
-        control_first = control < target
-        return stdgates.CNOT(dtype=dtype, device=device, control_first=control_first)
+        # Always use control_first=True so the gate matrix matches the qubit ordering.
+        return stdgates.CNOT(dtype=dtype, device=device, control_first=True)
     raise ValueError(
         f"Unsupported two-qubit gate name {name!r}. "
         "Currently only 'CNOT' is supported."

@@ -327,10 +327,10 @@ def GeneralKraus(
             f"Expected 2**n for some n >= 1."
         )
 
-    for i, K in enumerate(kraus_list):
-        if K.shape != first_shape:
+    for i, kraus_op in enumerate(kraus_list):
+        if kraus_op.shape != first_shape:
             raise ValueError(
-                f"Kraus operator {i} has shape {K.shape}, "
+                f"Kraus operator {i} has shape {kraus_op.shape}, "
                 f"but expected {first_shape}"
             )
 
@@ -347,4 +347,6 @@ __all__ = [
     "AmplitudeDampingChannel",
     "GeneralKraus",
 ]
+
+
 

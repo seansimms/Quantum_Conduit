@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Callable, Optional, Sequence
 
 import torch
 
@@ -115,7 +115,10 @@ def parameter_shift_single(
     """
     # Validation
     if params.ndim != 1:
-        raise ValueError(f"params must be a 1D tensor, got shape {params.shape} with ndim={params.ndim}")
+        raise ValueError(
+            "params must be a 1D tensor, "
+            f"got shape {params.shape} with ndim={params.ndim}"
+        )
 
     n_params = params.numel()
     if not (0 <= index < n_params):
@@ -143,11 +146,13 @@ def parameter_shift_single(
     # Validate scalar outputs
     if value_plus.ndim != 0:
         raise ValueError(
-            f"objective must return a scalar tensor (0D), got shape {value_plus.shape} with ndim={value_plus.ndim}"
+            "objective must return a scalar tensor (0D), "
+            f"got shape {value_plus.shape} with ndim={value_plus.ndim}"
         )
     if value_minus.ndim != 0:
         raise ValueError(
-            f"objective must return a scalar tensor (0D), got shape {value_minus.shape} with ndim={value_minus.ndim}"
+            "objective must return a scalar tensor (0D), "
+            f"got shape {value_minus.shape} with ndim={value_minus.ndim}"
         )
 
     # Compute gradient
@@ -193,7 +198,10 @@ def parameter_shift_gradient(
     """
     # Validation
     if params.ndim != 1:
-        raise ValueError(f"params must be a 1D tensor, got shape {params.shape} with ndim={params.ndim}")
+        raise ValueError(
+            "params must be a 1D tensor, "
+            f"got shape {params.shape} with ndim={params.ndim}"
+        )
     if params.numel() == 0:
         raise ValueError("params must be non-empty")
 
@@ -257,7 +265,10 @@ def autograd_gradient(
     """
     # Validation
     if params.ndim != 1:
-        raise ValueError(f"params must be a 1D tensor, got shape {params.shape} with ndim={params.ndim}")
+        raise ValueError(
+            "params must be a 1D tensor, "
+            f"got shape {params.shape} with ndim={params.ndim}"
+        )
 
     # Clone parameters and enable gradients
     params_local = params.clone().detach().requires_grad_(True)
@@ -268,7 +279,8 @@ def autograd_gradient(
     # Validate scalar output
     if value.ndim != 0:
         raise ValueError(
-            f"objective must return a scalar tensor (0D), got shape {value.shape} with ndim={value.ndim}"
+            "objective must return a scalar tensor (0D), "
+            f"got shape {value.shape} with ndim={value.ndim}"
         )
 
     # Compute gradient

@@ -132,7 +132,9 @@ def test_batched_state_renormalize():
     batched = BatchedState(states, n_qubits=2)
 
     # Create unnormalized version
-    states_unnorm = batched.states * torch.tensor([2.0, 0.5, 3.0], dtype=torch.complex128).unsqueeze(1)
+    states_unnorm = batched.states * torch.tensor(
+        [2.0, 0.5, 3.0], dtype=torch.complex128
+    ).unsqueeze(1)
     batched_unnorm = BatchedState(states_unnorm, n_qubits=2)
 
     # Renormalize

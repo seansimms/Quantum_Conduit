@@ -10,9 +10,9 @@ from typing import Tuple
 
 # Type hints for matplotlib (optional dependency)
 try:
+    from matplotlib import pyplot as plt
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
-    from matplotlib import pyplot as plt
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
@@ -103,4 +103,6 @@ def create_projection_axes() -> Tuple["Axes", "Axes", "Axes"]:
     plt.tight_layout()
 
     return axes[0], axes[1], axes[2]
+
+
 

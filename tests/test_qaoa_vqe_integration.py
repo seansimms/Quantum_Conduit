@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from qconduit.core.device import default_device
-from qconduit.algorithms import ising_maxcut_hamiltonian, QAOAAnsatz
+from qconduit.algorithms import QAOAAnsatz, ising_maxcut_hamiltonian
 from qconduit.algorithms.vqe import VQE
 
 
@@ -117,6 +116,8 @@ def test_qaoa_vqe_energy_larger_graph() -> None:
     # Check gradients
     energy.backward()
     assert params.grad is not None
+
+
 
 
 

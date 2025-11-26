@@ -305,7 +305,8 @@ class TestVQEPauliSum:
 
         # Initialize parameters away from critical point (params=0 has zero gradient)
         # Start at a small positive value where gradient is non-zero
-        params = torch.nn.Parameter(torch.tensor([0.1]))  # Start near |0⟩ but with non-zero gradient
+        # Start near |0⟩ but with non-zero gradient
+        params = torch.nn.Parameter(torch.tensor([0.1]))
 
         # Optimizer
         optimizer = torch.optim.SGD([params], lr=0.1)

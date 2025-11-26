@@ -48,8 +48,6 @@ dmypy.json
 .ruff_cache/
 
 # Internal documentation and tooling (not for public repo)
-WEBSITE_COPY.md
-LINKEDIN_POST.md
 AUDIT_REPORT*.md
 RECOMMENDATIONS*.md
 PYPI_PUBLISHING.md

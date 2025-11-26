@@ -2,8 +2,8 @@
 
 import pytest
 import torch
-import qconduit as qc
-from qconduit.core.device import Device, device, default_device
+
+from qconduit.core.device import Device, default_device, device
 from qconduit.core.module import QuantumModule
 
 

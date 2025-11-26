@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import pi, isclose
+from math import isclose, pi
 from typing import Sequence
 
 from qconduit.circuit import QuantumCircuit

@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from qconduit.circuit import QuantumCircuit
-from qconduit.io import parse_qasm_string, export_circuit_to_qasm
+from qconduit.io import export_circuit_to_qasm, parse_qasm_string
 
 
 def _compare_states_up_to_global_phase(
@@ -53,7 +53,7 @@ cx q[0],q[1];
         # CNOT(0,1) with control=LSB and target=MSB gives (|00⟩ + |01⟩)/sqrt(2) (no change)
         # The actual behavior depends on CNOT implementation
         state = circuit.simulate_state()
-        
+
         # Compare with hand-constructed equivalent (tested separately)
         hand_circuit = QuantumCircuit(2)
         hand_circuit.add_gate("H", [0])

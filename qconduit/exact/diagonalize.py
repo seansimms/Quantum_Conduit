@@ -92,7 +92,7 @@ def paulisum_to_dense(
         device = default_device().as_torch_device()
 
     dim = 1 << num_qubits  # 2**num_qubits
-    H = torch.zeros((dim, dim), dtype=dtype, device=device)
+    h_dense = torch.zeros((dim, dim), dtype=dtype, device=device)
 
     # Build dense matrix for each term
     for term in hamiltonian.terms:
@@ -109,13 +109,13 @@ def paulisum_to_dense(
             term_matrix = torch.kron(term_matrix, pauli_i)
 
         # Add to total matrix with coefficient
-        H = H + coeff * term_matrix
+        h_dense = h_dense + coeff * term_matrix
 
     # Enforce Hermiticity numerically (harmless for analytic PauliSum input,
     # but helps with numerical roundoff)
-    H = (H + H.conj().T) / 2.0
+    h_dense = (h_dense + h_dense.conj().T) / 2.0
 
-    return H
+    return h_dense
 
 
 def exact_eigensystem(
@@ -158,10 +158,10 @@ def exact_eigensystem(
     if k is not None:
         raise ValueError("Partial spectrum (k != None) is not supported yet.")
 
-    H = paulisum_to_dense(hamiltonian, num_qubits, device=device, dtype=dtype)
+    h_dense = paulisum_to_dense(hamiltonian, num_qubits, device=device, dtype=dtype)
 
     # Compute eigensystem (eigenvalues are real for Hermitian matrices)
-    eigenvalues, eigenvectors = torch.linalg.eigh(H)
+    eigenvalues, eigenvectors = torch.linalg.eigh(h_dense)
 
     # Ensure eigenvalues are real (they should be, but take .real for safety)
     eigenvalues = eigenvalues.real
@@ -215,6 +215,8 @@ def exact_ground_state(
     ground_state = ground_state / norm
 
     return ground_energy, ground_state
+
+
 
 
 

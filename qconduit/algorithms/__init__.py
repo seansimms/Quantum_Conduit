@@ -1,6 +1,6 @@
 """Quantum algorithms."""
 
-from .qaoa import Edge, ising_maxcut_hamiltonian, QAOAAnsatz
+from .qaoa import Edge, QAOAAnsatz, ising_maxcut_hamiltonian
 from .vqe import VQE
 
 __all__ = [

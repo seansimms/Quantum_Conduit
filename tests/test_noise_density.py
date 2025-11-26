@@ -8,19 +8,17 @@ import pytest
 import torch
 
 from qconduit.noise import (
-    bit_flip_channel,
-    phase_flip_channel,
-    depolarizing_channel,
-    phase_damping_channel,
     amplitude_damping_channel,
-    generalized_amplitude_damping_channel,
-    two_qubit_depolarizing_channel,
-    to_density_matrix,
     apply_kraus_channel_to_density_matrix,
     apply_kraus_channel_to_statevector,
+    bit_flip_channel,
     compose_kraus_channels,
+    depolarizing_channel,
+    generalized_amplitude_damping_channel,
+    phase_damping_channel,
+    to_density_matrix,
+    two_qubit_depolarizing_channel,
 )
-from qconduit.core.device import default_device
 
 
 def test_to_density_matrix_zero_state():

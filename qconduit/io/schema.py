@@ -34,8 +34,6 @@ Qubit ordering convention:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-
 
 def json_circuit_schema() -> dict:
     """
@@ -227,4 +225,6 @@ def validate_json_circuit(obj: dict) -> None:
 
 
 __all__ = ["json_circuit_schema", "validate_json_circuit"]
+
+
 

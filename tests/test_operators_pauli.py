@@ -3,8 +3,8 @@
 import pytest
 import torch
 
-from qconduit.operators.pauli import PauliTerm, PauliSum
 from qconduit.gates.standard import I, X, Y, Z
+from qconduit.operators.pauli import PauliSum, PauliTerm
 
 
 class TestPauliTerm:
@@ -235,7 +235,12 @@ class TestPauliSumMatrixConversion:
         matrix = H.to_matrix()
 
         expected = torch.tensor(
-            [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [0.0, 0.0, 0.0, 1.0]],
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0, 0.0],
+                [0.0, 0.0, -1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             dtype=torch.complex64,
         )
         assert torch.allclose(matrix, expected, atol=1e-6)

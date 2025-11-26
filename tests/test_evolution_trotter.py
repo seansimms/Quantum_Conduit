@@ -355,7 +355,6 @@ def test_build_trotter_step_circuit_complex_coefficient():
     # Create a term with complex coefficient
     # Note: PauliTerm accepts float, but we can test the validation in _add_time_evolution_for_term
     # by creating a term and then trying to use it
-    term = PauliTerm(coeff=1.0, paulis=("Z",))
     # The coefficient validation happens in _add_time_evolution_for_term
     # Since PauliTerm only accepts float, we can't easily test complex coefficients
     # without modifying the code. This is acceptable as the type system prevents it.

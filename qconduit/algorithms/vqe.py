@@ -8,10 +8,10 @@ import torch
 from torch import nn
 
 from ..core.device import Device
-from ..layers.ansatzes import ParametricAnsatz
-from ..operators.pauli import PauliSum
-from ..operators.expectation import expectation_pauli_sum, expectation_pauli_sum_dm
 from ..grad import param_shift_energy
+from ..layers.ansatzes import ParametricAnsatz
+from ..operators.expectation import expectation_pauli_sum, expectation_pauli_sum_dm
+from ..operators.pauli import PauliSum
 
 if TYPE_CHECKING:
     from ..noise import NoiseModel
@@ -264,7 +264,6 @@ class VQE(nn.Module):
                 )
         else:
             # Noisy path: use density matrix expectations
-            from ..backend.density_matrix import dm_from_statevector
 
             n_qubits = self.ansatz.n_qubits
             rho = self.noise_model.apply_statevector(state, n_qubits=n_qubits)
@@ -272,8 +271,8 @@ class VQE(nn.Module):
             if self.hamiltonian_diag is not None:
                 # Diagonal Hamiltonian path with density matrix
                 diag = rho.diagonal(dim1=-2, dim2=-1).real
-                diag_H = self.hamiltonian_diag.to(dtype=diag.dtype, device=diag.device)
-                energy = (diag * diag_H).sum(dim=-1)
+                diag_h = self.hamiltonian_diag.to(dtype=diag.dtype, device=diag.device)
+                energy = (diag * diag_h).sum(dim=-1)
                 return energy
             elif self.hamiltonian_pauli is not None:
                 # Pauli-sum Hamiltonian path with density matrix

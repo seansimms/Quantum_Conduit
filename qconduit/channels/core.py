@@ -58,43 +58,43 @@ class KrausChannel:
         dtype = None
         device = None
 
-        for i, K in enumerate(self.kraus_ops):
+        for i, kraus_op in enumerate(self.kraus_ops):
             # Ensure it is a torch.Tensor
-            if not isinstance(K, torch.Tensor):
+            if not isinstance(kraus_op, torch.Tensor):
                 raise ValueError(
-                    f"Kraus operator {i} must be a torch.Tensor, got {type(K)}"
+                    f"Kraus operator {i} must be a torch.Tensor, got {type(kraus_op)}"
                 )
 
             # Ensure 2D and square
-            if K.dim() != 2:
+            if kraus_op.dim() != 2:
                 raise ValueError(
-                    f"Kraus operator {i} must be 2D, got {K.dim()} dimensions"
+                    f"Kraus operator {i} must be 2D, got {kraus_op.dim()} dimensions"
                 )
-            if K.shape[0] != K.shape[1]:
+            if kraus_op.shape[0] != kraus_op.shape[1]:
                 raise ValueError(
-                    f"Kraus operator {i} must be square, got shape {K.shape}"
+                    f"Kraus operator {i} must be square, got shape {kraus_op.shape}"
                 )
-            if K.shape[0] != dim:
+            if kraus_op.shape[0] != dim:
                 raise ValueError(
-                    f"Kraus operator {i} must have shape ({dim}, {dim}), got {K.shape}"
+                    f"Kraus operator {i} must have shape ({dim}, {dim}), got {kraus_op.shape}"
                 )
 
             # Enforce complex128 dtype and default device
             target_device = default_device().as_torch_device()
-            if not torch.is_complex(K):
-                K_complex = K.to(dtype=torch.complex128, device=target_device)
+            if not torch.is_complex(kraus_op):
+                kraus_complex = kraus_op.to(dtype=torch.complex128, device=target_device)
             else:
-                K_complex = K.to(dtype=torch.complex128, device=target_device)
-            normalized_ops.append(K_complex)
+                kraus_complex = kraus_op.to(dtype=torch.complex128, device=target_device)
+            normalized_ops.append(kraus_complex)
 
             # Track dtype and device from first operator
             if dtype is None:
-                dtype = K_complex.dtype
-                device = K_complex.device
+                dtype = kraus_complex.dtype
+                device = kraus_complex.device
 
         # Ensure all operators are on same device and dtype
         normalized_ops = [
-            K.to(dtype=dtype, device=device) for K in normalized_ops
+            op.to(dtype=dtype, device=device) for op in normalized_ops
         ]
 
         # Use object.__setattr__ to modify frozen dataclass
@@ -104,9 +104,9 @@ class KrausChannel:
         identity = torch.eye(dim, dtype=dtype, device=device)
         sum_kdag_k = torch.zeros((dim, dim), dtype=dtype, device=device)
 
-        for K in self.kraus_ops:
-            Kdag = K.conj().T
-            sum_kdag_k = sum_kdag_k + Kdag @ K
+        for kraus_op in self.kraus_ops:
+            kraus_dag = kraus_op.conj().T
+            sum_kdag_k = sum_kdag_k + kraus_dag @ kraus_op
 
         # Check if sum_kdag_k ≈ I within tolerance
         # Use relative tolerance for better numerical stability with accumulated errors
@@ -162,10 +162,10 @@ class KrausChannel:
 
         # Apply channel: E(ρ) = ∑_k K_k ρ K_k^†
         new_rho = torch.zeros_like(rho)
-        for K in self.kraus_ops:
-            Krho = K @ rho
-            KrhoKdag = Krho @ K.conj().T
-            new_rho = new_rho + KrhoKdag
+        for kraus_op in self.kraus_ops:
+            kraus_rho = kraus_op @ rho
+            kraus_rho_kdag = kraus_rho @ kraus_op.conj().T
+            new_rho = new_rho + kraus_rho_kdag
 
         return new_rho
 
@@ -260,10 +260,10 @@ class KrausChannel:
 
         device = self.kraus_ops[0].device
         dtype = self.kraus_ops[0].dtype
-        I_single = torch.eye(2, dtype=dtype, device=device)
+        identity_single = torch.eye(2, dtype=dtype, device=device)
 
         extended_kraus_ops = []
-        for K in self.kraus_ops:
+        for kraus_op in self.kraus_ops:
             # Build tensor product: P_{n-1} ⊗ P_{n-2} ⊗ ... ⊗ P_0
             # where P_i = K if i in target_qubits, else I
             # Convention: qubit 0 is LSB, so we build from MSB (n-1) down to LSB (0)
@@ -271,23 +271,22 @@ class KrausChannel:
             # For single-qubit channels: target_qubits has one element
             if self.n_qubits == 1:
                 target_qubit = target_qubits[0]
-                # Build F = I ⊗ ... ⊗ K ⊗ ... ⊗ I
+                # Build tensor_op = I ⊗ ... ⊗ K ⊗ ... ⊗ I
                 # Start with the operator for the highest qubit
-                F = K if (total_n_qubits - 1) == target_qubit else I_single
+                tensor_op = (
+                    kraus_op if (total_n_qubits - 1) == target_qubit else identity_single
+                )
                 for q in range(total_n_qubits - 2, -1, -1):
-                    if q == target_qubit:
-                        op = K
-                    else:
-                        op = I_single
-                    F = torch.kron(F, op)
+                    operand = kraus_op if q == target_qubit else identity_single
+                    tensor_op = torch.kron(tensor_op, operand)
             else:
                 # Multi-qubit extension: need to map target_qubits to positions in K
                 # This is more complex and not needed for built-in channels
-                # 
+                #
                 # LIMITATION: Multi-qubit channel extension (n_qubits > 1) is not
                 # currently implemented. This means you cannot use tensor_extend()
                 # with channels that act on more than one qubit simultaneously.
-                # 
+                #
                 # Workaround: For multi-qubit channels, construct the full-system
                 # Kraus operators manually using tensor products, or use the channel
                 # directly on a density matrix of the appropriate size.
@@ -298,7 +297,7 @@ class KrausChannel:
                     "See the module documentation for workarounds."
                 )
 
-            extended_kraus_ops.append(F)
+            extended_kraus_ops.append(tensor_op)
 
         return KrausChannel(
             kraus_ops=tuple(extended_kraus_ops), n_qubits=total_n_qubits
@@ -332,11 +331,10 @@ class KrausChannel:
                 f"{self.n_qubits} vs {other.n_qubits}"
             )
 
-        # Build composed Kraus operators: K^{(2)}_a K^{(1)}_b
         composed_ops = []
-        for K2 in other.kraus_ops:
-            for K1 in self.kraus_ops:
-                composed_ops.append(K2 @ K1)
+        for op_second in other.kraus_ops:
+            for op_first in self.kraus_ops:
+                composed_ops.append(op_second @ op_first)
 
         return KrausChannel(kraus_ops=tuple(composed_ops), n_qubits=self.n_qubits)
 
@@ -357,14 +355,12 @@ class KrausChannel:
         dtype = self.kraus_ops[0].dtype
 
         # Build superoperator: S = ∑_k K_k ⊗ K_k^*
-        # where ⊗ is Kronecker product and * is element-wise conjugate
-        S = torch.zeros((dim * dim, dim * dim), dtype=dtype, device=device)
-        for K in self.kraus_ops:
-            K_conj = K.conj()
-            # Kronecker product: K ⊗ K^*
-            S = S + torch.kron(K, K_conj)
+        superop = torch.zeros((dim * dim, dim * dim), dtype=dtype, device=device)
+        for kraus_op in self.kraus_ops:
+            kraus_conj = kraus_op.conj()
+            superop = superop + torch.kron(kraus_op, kraus_conj)
 
-        return S
+        return superop
 
     def is_cptp(self, atol: float = 1e-8, rtol: float = 1e-6) -> bool:
         """
@@ -393,9 +389,9 @@ class KrausChannel:
         identity = torch.eye(dim, dtype=dtype, device=device)
         sum_kdag_k = torch.zeros((dim, dim), dtype=dtype, device=device)
 
-        for K in self.kraus_ops:
-            Kdag = K.conj().T
-            sum_kdag_k = sum_kdag_k + Kdag @ K
+        for kraus_op in self.kraus_ops:
+            kraus_dag = kraus_op.conj().T
+            sum_kdag_k = sum_kdag_k + kraus_dag @ kraus_op
 
         diff = torch.abs(sum_kdag_k - identity)
         max_diff = torch.max(diff).item()
@@ -448,9 +444,9 @@ class KrausChannel:
 
         # Compute probabilities: p_k = ⟨ψ|K_k^† K_k|ψ⟩
         probs = []
-        for K in self.kraus_ops:
-            KdagK = K.conj().T @ K
-            prob_k = (psi.conj() @ KdagK @ psi).real
+        for kraus_op in self.kraus_ops:
+            op_dag_op = kraus_op.conj().T @ kraus_op
+            prob_k = (psi.conj() @ op_dag_op @ psi).real
             if prob_k < 0:
                 prob_k = 0.0  # Numerical errors can produce tiny negatives
             probs.append(prob_k)
@@ -470,9 +466,9 @@ class KrausChannel:
 
         j = torch.multinomial(probs_tensor, num_samples=1, generator=generator).item()
 
-        # Compute output state: K_j |ψ⟩
-        K_j = self.kraus_ops[j]
-        psi_out = K_j @ psi
+        # Compute output state for the sampled Kraus operator
+        sampled_op = self.kraus_ops[j]
+        psi_out = sampled_op @ psi
 
         # Normalize
         norm = torch.norm(psi_out)

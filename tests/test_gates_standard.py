@@ -1,8 +1,9 @@
 """Tests for standard quantum gates."""
 
-import pytest
-import torch
 import math
+
+import torch
+
 import qconduit as qc
 from qconduit.gates.standard import is_unitary
 

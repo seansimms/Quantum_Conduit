@@ -253,8 +253,8 @@ class TestGeneralKraus:
         dtype = torch.complex128
 
         # Identity channel
-        I = torch.eye(2, dtype=dtype, device=device)
-        channel = GeneralKraus([I])
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        channel = GeneralKraus([identity_mat])
         assert channel.n_qubits == 1
         assert len(channel.kraus_ops) == 1
         assert channel.is_cptp()
@@ -269,11 +269,11 @@ class TestGeneralKraus:
         device = torch.device("cpu")
         dtype = torch.complex128
 
-        I = torch.eye(2, dtype=dtype, device=device)
-        I4 = torch.eye(4, dtype=dtype, device=device)
+        identity_mat = torch.eye(2, dtype=dtype, device=device)
+        identity_mat_4 = torch.eye(4, dtype=dtype, device=device)
 
         with pytest.raises(ValueError, match="shape"):
-            GeneralKraus([I, I4])
+            GeneralKraus([identity_mat, identity_mat_4])
 
     def test_construction_non_power_of_two_raises(self):
         """Test that non-power-of-two dimension raises error."""

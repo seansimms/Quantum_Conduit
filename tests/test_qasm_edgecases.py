@@ -8,8 +8,13 @@ import pytest
 import torch
 
 from qconduit.circuit import QuantumCircuit
-from qconduit.io import parse_qasm_string, parse_qasm_file, export_circuit_to_qasm
-from qconduit.io.utils import angle_str_to_float, float_to_angle_str, gate_name_normalize, safe_int_list_from_str
+from qconduit.io import parse_qasm_file, parse_qasm_string
+from qconduit.io.utils import (
+    angle_str_to_float,
+    float_to_angle_str,
+    gate_name_normalize,
+    safe_int_list_from_str,
+)
 
 
 def _compare_states_up_to_global_phase(
@@ -275,8 +280,8 @@ class TestUtilsHelpers:
 
     def test_parse_qasm_file(self):
         """Test parsing QASM from file."""
-        import tempfile
         import os
+        import tempfile
 
         qasm_content = """OPENQASM 2.0;
 qreg q[1];

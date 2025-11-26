@@ -13,8 +13,8 @@ import torch
 
 # Type hint for matplotlib Axes (optional dependency)
 try:
-    from matplotlib.axes import Axes
     from matplotlib import pyplot as plt
+    from matplotlib.axes import Axes
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False

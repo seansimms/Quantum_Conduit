@@ -53,12 +53,12 @@ class NoiseConfig:
 
 def _apply_unitary_to_dm(
     rho: torch.Tensor,
-    U: torch.Tensor,
+    unitary: torch.Tensor,
     qubits: tuple[int, ...],
     n_qubits: int,
 ) -> torch.Tensor:
     """
-    Apply a unitary gate U to a density matrix rho.
+    Apply a unitary gate to a density matrix rho.
 
     For a unitary U, the evolution is: rho -> U rho U^\\dagger.
 
@@ -66,7 +66,7 @@ def _apply_unitary_to_dm(
     ----------
     rho:
         Density matrix of shape (dim, dim) with dim = 2**n_qubits.
-    U:
+    unitary:
         Unitary gate matrix. For single-qubit gates, shape (2, 2).
         For two-qubit gates, shape (4, 4).
     qubits:
@@ -82,11 +82,11 @@ def _apply_unitary_to_dm(
     if len(qubits) == 1:
         # Single-qubit gate - use the helper
         qubit = qubits[0]
-        return _apply_single_qubit_unitary_to_dm(rho, U, qubit, n_qubits)
+        return _apply_single_qubit_unitary_to_dm(rho, unitary, qubit, n_qubits)
     elif len(qubits) == 2:
         # Two-qubit gate - use the helper
         q0, q1 = qubits
-        return _apply_two_qubit_unitary_to_dm(rho, U, q0, q1, n_qubits)
+        return _apply_two_qubit_unitary_to_dm(rho, unitary, q0, q1, n_qubits)
     else:
         raise ValueError(
             f"Gates acting on {len(qubits)} qubits are not supported. "
@@ -96,7 +96,7 @@ def _apply_unitary_to_dm(
 
 def _apply_single_qubit_unitary_to_dm(
     rho: torch.Tensor,
-    U: torch.Tensor,
+    unitary: torch.Tensor,
     qubit: int,
     n_qubits: int,
 ) -> torch.Tensor:
@@ -105,32 +105,28 @@ def _apply_single_qubit_unitary_to_dm(
 
     Builds U_full = I ⊗ ... ⊗ U ⊗ ... ⊗ I and applies: rho -> U_full rho U_full^\\dagger.
     """
-    dim = rho.shape[-1]
     dtype = rho.dtype
     device = rho.device
 
     # Build full-system unitary by tensoring with identity
-    I_single = torch.eye(2, dtype=dtype, device=device)
+    identity_single = torch.eye(2, dtype=dtype, device=device)
 
-    # Build U_full = I ⊗ ... ⊗ U ⊗ ... ⊗ I
+    # Build the embedded unitary
     # Convention: qubit 0 is LSB, build from n_qubits-1 down to 0
-    U_full = U if (n_qubits - 1) == qubit else I_single
+    full_unitary = unitary if (n_qubits - 1) == qubit else identity_single
     for q in range(n_qubits - 2, -1, -1):
-        if q == qubit:
-            op = U
-        else:
-            op = I_single
-        U_full = _kron(U_full, op)
+        operand = unitary if q == qubit else identity_single
+        full_unitary = _kron(full_unitary, operand)
 
     # Apply unitary: rho -> U_full rho U_full^\dagger
-    Urho = torch.matmul(U_full, rho)
-    UrhoUdag = torch.matmul(Urho, U_full.conj().transpose(-2, -1))
-    return UrhoUdag
+    tmp = torch.matmul(full_unitary, rho)
+    result = torch.matmul(tmp, full_unitary.conj().transpose(-2, -1))
+    return result
 
 
 def _apply_two_qubit_unitary_to_dm(
     rho: torch.Tensor,
-    U: torch.Tensor,
+    unitary: torch.Tensor,
     qubit1: int,
     qubit2: int,
     n_qubits: int,
@@ -153,9 +149,7 @@ def _apply_two_qubit_unitary_to_dm(
     swapped = qubit1 > qubit2
 
     # Build the full unitary matrix explicitly
-    # For a 2-qubit gate U on qubits q_low and q_high, we need to embed it into
-    # the full 2**n_qubits dimensional space
-    U_full = torch.zeros((dim, dim), dtype=dtype, device=device)
+    full_unitary = torch.zeros((dim, dim), dtype=dtype, device=device)
 
     # Iterate through all basis states
     for i in range(dim):
@@ -166,7 +160,7 @@ def _apply_two_qubit_unitary_to_dm(
         bit_low_i = bits_i[q_low]
         bit_high_i = bits_i[q_high]
 
-        # Index into U: U is defined for |qubit1, qubit2> basis
+        # Index into unitary: defined for |qubit1, qubit2> basis
         # If swapped, qubit1 > qubit2, so U acts on |q_high, q_low>
         # If not swapped, qubit1 < qubit2, so U acts on |q_low, q_high>
         if swapped:
@@ -196,12 +190,12 @@ def _apply_two_qubit_unitary_to_dm(
                 u_idx_out = bit_low_j * 2 + bit_high_j
 
             # Set the matrix element
-            U_full[i, j] = U[u_idx_in, u_idx_out]
+            full_unitary[i, j] = unitary[u_idx_in, u_idx_out]
 
     # Apply: rho -> U_full rho U_full^\dagger
-    Urho = torch.matmul(U_full, rho)
-    UrhoUdag = torch.matmul(Urho, U_full.conj().transpose(-2, -1))
-    return UrhoUdag
+    tmp = torch.matmul(full_unitary, rho)
+    result = torch.matmul(tmp, full_unitary.conj().transpose(-2, -1))
+    return result
 
 
 def _resolve_single_qubit_gate(

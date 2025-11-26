@@ -22,8 +22,8 @@ from torch.autograd import Function
 
 from qconduit.core.device import Device
 from qconduit.layers.ansatzes import ParametricAnsatz
-from qconduit.operators.pauli import PauliSum
 from qconduit.operators.expectation import expectation_pauli_sum, expectation_pauli_sum_dm
+from qconduit.operators.pauli import PauliSum
 
 if TYPE_CHECKING:
     from qconduit.noise import NoiseModel
@@ -114,7 +114,6 @@ def evaluate_energy(
             energy = (probs * hamiltonian).sum(dim=-1)
     else:
         # Noisy path: use density matrix expectations
-        from qconduit.backend.density_matrix import dm_from_statevector, measure_probs_dm
 
         n_qubits = ansatz.n_qubits
         rho = noise_model.apply_statevector(state, n_qubits=n_qubits)

@@ -30,7 +30,7 @@ from typing import Dict, List, Optional, Tuple
 
 from qconduit.circuit import QuantumCircuit
 
-from .utils import angle_str_to_float, float_to_angle_str, gate_name_normalize
+from .utils import angle_str_to_float, float_to_angle_str
 
 
 def parse_qasm_string(qasm: str) -> QuantumCircuit:
@@ -434,10 +434,10 @@ def _gate_to_qasm(op) -> Optional[str]:
     """Convert a GateOp to QASM line."""
     # Access the gate operation attributes
     from qconduit.circuit import GateOp
-    
+
     if not isinstance(op, GateOp):
         raise TypeError(f"Expected GateOp, got {type(op)}")
-    
+
     name = op.name.upper()
     qubits = op.qubits
     params = op.params

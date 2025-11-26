@@ -1,18 +1,19 @@
 """Tests for density-matrix backend operations."""
 
-import pytest
-import torch
 import math
 
+import pytest
+import torch
+
 from qconduit.backend.density_matrix import (
-    zero_dm_state,
-    dm_from_statevector,
     apply_kraus_single_qubit,
-    measure_probs_dm,
+    dm_from_statevector,
     measure_expectation_z_dm,
+    measure_probs_dm,
+    zero_dm_state,
 )
 from qconduit.backend.statevector import zero_state
-from qconduit.gates.standard import I, X, Y, Z, H
+from qconduit.gates.standard import I, X
 
 
 class TestZeroDMState:

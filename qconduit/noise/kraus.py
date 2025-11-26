@@ -51,38 +51,38 @@ class KrausChannel:
         dtype = None
         device = None
 
-        for i, K in enumerate(self.kraus_ops):
+        for i, kraus_op in enumerate(self.kraus_ops):
             # Ensure it is a torch.Tensor
-            if not isinstance(K, torch.Tensor):
+            if not isinstance(kraus_op, torch.Tensor):
                 raise ValueError(
-                    f"Kraus operator {i} must be a torch.Tensor, got {type(K)}"
+                    f"Kraus operator {i} must be a torch.Tensor, got {type(kraus_op)}"
                 )
 
             # Ensure 2D and correct shape
-            if K.dim() != 2:
+            if kraus_op.dim() != 2:
                 raise ValueError(
-                    f"Kraus operator {i} must be 2D, got {K.dim()} dimensions"
+                    f"Kraus operator {i} must be 2D, got {kraus_op.dim()} dimensions"
                 )
-            if K.shape != (dim, dim):
+            if kraus_op.shape != (dim, dim):
                 raise ValueError(
-                    f"Kraus operator {i} must have shape ({dim}, {dim}), got {K.shape}"
+                    f"Kraus operator {i} must have shape ({dim}, {dim}), got {kraus_op.shape}"
                 )
 
             # Enforce complex dtype - convert to complex128 if not already complex
-            if not torch.is_complex(K):
-                K_complex = K.to(dtype=torch.complex128)
+            if not torch.is_complex(kraus_op):
+                k_complex = kraus_op.to(dtype=torch.complex128)
             else:
-                K_complex = K
-            normalized_ops.append(K_complex)
+                k_complex = kraus_op
+            normalized_ops.append(k_complex)
 
             # Track dtype and device from first operator
             if dtype is None:
-                dtype = K_complex.dtype
-                device = K_complex.device
+                dtype = k_complex.dtype
+                device = k_complex.device
 
         # Ensure all operators are on same device and dtype
         normalized_ops = [
-            K.to(dtype=dtype, device=device) for K in normalized_ops
+            op.to(dtype=dtype, device=device) for op in normalized_ops
         ]
 
         # Use object.__setattr__ to modify frozen dataclass
@@ -92,9 +92,9 @@ class KrausChannel:
         identity = torch.eye(dim, dtype=dtype, device=device)
         sum_kdag_k = torch.zeros((dim, dim), dtype=dtype, device=device)
 
-        for K in self.kraus_ops:
-            Kdag = K.conj().T
-            sum_kdag_k = sum_kdag_k + Kdag @ K
+        for kraus_op in self.kraus_ops:
+            k_dag = kraus_op.conj().T
+            sum_kdag_k = sum_kdag_k + k_dag @ kraus_op
 
         # Check if sum_kdag_k ≈ I
         diff = torch.abs(sum_kdag_k - identity)
@@ -130,7 +130,9 @@ class KrausChannel:
 
         # Transform all Kraus operators
         # Use .to() with both device and dtype to ensure conversion happens
-        new_ops = tuple(K.to(device=target_device, dtype=target_dtype) for K in self.kraus_ops)
+        new_ops = tuple(
+            op.to(device=target_device, dtype=target_dtype) for op in self.kraus_ops
+        )
 
         # Create new channel (validation will run in __post_init__)
         return KrausChannel(
@@ -170,9 +172,9 @@ class KrausChannel:
         identity = torch.eye(dim, dtype=dtype, device=device)
         sum_kdag_k = torch.zeros((dim, dim), dtype=dtype, device=device)
 
-        for K in self.kraus_ops:
-            Kdag = K.conj().T
-            sum_kdag_k = sum_kdag_k + Kdag @ K
+        for kraus_op in self.kraus_ops:
+            k_dag = kraus_op.conj().T
+            sum_kdag_k = sum_kdag_k + k_dag @ kraus_op
 
         diff = torch.abs(sum_kdag_k - identity)
         max_diff = torch.max(diff).item()
@@ -419,7 +421,7 @@ def phase_damping_channel(gamma: Optional[float] = None, p: Optional[float] = No
         if p is None:
             raise ValueError("Either gamma or p must be provided")
         gamma = p
-    
+
     if gamma < 0.0 or gamma > 1.0:
         raise ValueError(f"Phase damping parameter gamma must be in [0, 1], got {gamma}")
 

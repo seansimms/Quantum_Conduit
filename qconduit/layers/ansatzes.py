@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 import torch
 
 from ..backend.statevector import apply_gate, apply_two_qubit_gate, zero_state
+from ..circuit import QuantumCircuit
 from ..core.device import Device, default_device
 from ..core.module import QuantumModule
 from ..gates.standard import CNOT, RX
-from ..circuit import QuantumCircuit
 
 if TYPE_CHECKING:
     pass

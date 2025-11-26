@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 import torch
 
-from qconduit.exact import exact_ground_state
 from qconduit.operators import PauliSum, PauliTerm
 from qconduit.variational import (
     HardwareEfficientAnsatz,
@@ -13,7 +12,6 @@ from qconduit.variational import (
     evaluate_expectation_value,
     run_vqe,
 )
-from qconduit.core.device import default_device
 
 
 class TestEvaluateExpectationValue:
@@ -176,6 +174,7 @@ class TestRunVQE:
 
     def test_sgd_optimizer(self) -> None:
         """Test that SGD optimizer works."""
+        torch.manual_seed(42)
         hamiltonian = PauliSum.from_terms([PauliTerm(1.0, ("Z",))])
         ansatz = HardwareEfficientAnsatz(num_qubits=1, num_layers=2)
         initial_params = torch.zeros(ansatz.num_parameters)
